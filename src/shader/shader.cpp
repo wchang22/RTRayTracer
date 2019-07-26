@@ -39,7 +39,8 @@ Shader::Shader(const char* path_vertex, const char* path_fragment) {
   }
 }
 
-Shader::Shader(const char* path_compute)
+Shader::Shader(const char* path_compute, unsigned int x, unsigned int y, unsigned int z)
+  : x(x), y(y), z(z)
 {
   std::string compute_source = read_source(path_compute);
   const char* compute_source_cstr = compute_source.c_str();
@@ -71,6 +72,11 @@ Shader::~Shader() {
 
 void Shader::use() const {
   glUseProgram(shader_program);
+}
+
+void Shader::dispatch_compute() const
+{
+  glDispatchCompute(x, y, z);
 }
 
 int Shader::get_uniform_location(std::string_view uniform) const {

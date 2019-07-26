@@ -9,7 +9,8 @@ using namespace glm;
 class Camera
 {
 public:
-  Camera(vec3 position, vec3 forward, vec3 up);
+  Camera(vec3 position, vec3 forward, vec3 up, int width, int height, float fovy);
+  ~Camera();
 
   enum class Direction {
     FORWARD,
@@ -20,8 +21,9 @@ public:
     DOWN,
   };
 
-  mat4 lookat() const;
-  mat4 perspective() const;
+  mat3 get_coord_frame() const;
+  vec2 get_coord_scale() const;
+  vec2 get_coord_dims() const;
   void move(Direction direction);
   void update_frames();
   void update_direction(float delta_x, float delta_y);
@@ -38,7 +40,11 @@ private:
   float last_frame = 0.0f;
   float pitch = 0.0f;
   float yaw = 270.0f;
-  float fovy = 45.0f;
+  float fovy;
+
+  int width, height;
+
+  unsigned int UBO;
 };
 
 #endif // CAMERA_H

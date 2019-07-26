@@ -11,7 +11,7 @@ Window::Window()
 
   const int width = Window::width();
   const int height = Window::height();
-  window = glfwCreateWindow(width, height, "LearnOpenGL", glfwGetPrimaryMonitor(), nullptr);
+  window = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
 
   if (!window) {
     glfwDestroyWindow(window);
@@ -33,7 +33,8 @@ Window::Window()
 
   camera = std::make_shared<Camera>(vec3(0.0f, 0.0f, 4.0f),
                                     vec3(0.0f, 0.0f, -1.0f),
-                                    vec3(0.0f, 1.0f, 0.0f));
+                                    vec3(0.0f, 1.0f, 0.0f),
+                                    width, height, 45.0f);
 
   try {
     display = std::make_unique<Display>(camera);
