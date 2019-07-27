@@ -17,8 +17,8 @@ public:
 
   void main_loop();
 
-  static int width();
-  static int height();
+  static int get_width();
+  static int get_height();
 
 private:
   static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -28,6 +28,8 @@ private:
   GLFWwindow* window;
   std::unique_ptr<Display> display;
   std::shared_ptr<Camera> camera;
+
+  static int width, height;
 };
 
 #endif // WINDOW_H

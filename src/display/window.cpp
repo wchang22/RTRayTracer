@@ -1,6 +1,10 @@
 #include "window.h"
 #include "util/exception.h"
 #include "util/data.h"
+#include "util/profiling/profiling.h"
+
+int Window::width = 0;
+int Window::height = 0;
 
 Window::Window()
 {
@@ -9,8 +13,8 @@ Window::Window()
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  const int width = Window::width();
-  const int height = Window::height();
+  width = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
+  height = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
   window = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
 
   if (!window) {
@@ -50,19 +54,26 @@ Window::~Window() {
 }
 
 void Window::main_loop() {
-  glEnable(GL_DEPTH_TEST);
-
   try {
     while (!glfwWindowShouldClose(window)) {
+      PROFILE_SCOPE("Main Loop")
+
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glClear(GL_COLOR_BUFFER_BIT);
 
+      PROFILE_SECTION_START("Display draw")
       display->draw();
+      PROFILE_SECTION_END()
 
+      PROFILE_SECTION_START("Swap buffers")
       glfwSwapBuffers(window);
+      PROFILE_SECTION_END()
+
+      PROFILE_SECTION_START("I/O Events")
       glfwPollEvents();
       key_callback();
       mouse_callback();
+      PROFILE_SECTION_END()
     }
   } catch (...) {
     glfwDestroyWindow(window);
@@ -70,14 +81,14 @@ void Window::main_loop() {
   }
 }
 
-int Window::width()
+int Window::get_width()
 {
-  return glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
+  return width;
 }
 
-int Window::height()
+int Window::get_height()
 {
-  return glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
+  return height;
 }
 
 void Window::framebuffer_size_callback(GLFWwindow* window, int width, int height) {

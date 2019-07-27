@@ -103,6 +103,16 @@ void Camera::update_direction(float delta_x, float delta_y) {
   forward = glm::normalize(forward);
 }
 
+void Camera::update_direction(vec3 direction)
+{
+  forward = direction;
+}
+
+void Camera::update_position(vec3 position)
+{
+  this->position = position;
+}
+
 vec3 Camera::get_position() const {
   return position;
 }

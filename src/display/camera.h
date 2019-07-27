@@ -27,6 +27,8 @@ public:
   void move(Direction direction);
   void update_frames();
   void update_direction(float delta_x, float delta_y);
+  void update_direction(vec3 direction);
+  void update_position(vec3 position);
   vec3 get_position() const;
   vec3 get_direction() const;
 
