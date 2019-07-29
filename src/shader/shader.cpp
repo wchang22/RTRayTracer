@@ -76,7 +76,7 @@ void Shader::use() const {
 
 void Shader::dispatch_compute() const
 {
-  glDispatchCompute(x, y, z);
+  glDispatchCompute(x / 32, y / 24, z);
 }
 
 int Shader::get_uniform_location(std::string_view uniform) const {

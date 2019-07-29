@@ -9,7 +9,7 @@ public:
   Image(int width, int height);
   ~Image();
 
-  void use(const Shader& shader) const;
+  void use() const;
 
 private:
   unsigned int texture;

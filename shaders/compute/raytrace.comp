@@ -1,14 +1,7 @@
 #version 450 core
 
-layout (local_size_x = 2, local_size_y = 2, local_size_z = 1) in;
-layout (rgba16f, binding = 0) uniform writeonly restrict image2D img_output;
-
-layout (std140, binding = 2) uniform EyeCoords {
-    vec2 coord_scale;
-    vec2 coord_dims;
-    vec3 eye_pos;
-    mat3 eye_coord_frame;
-};
+layout (local_size_x = 32, local_size_y = 24) in;
+layout (rgba8, binding = 0) uniform writeonly restrict image2D img_output;
 
 struct Ray {
     vec3 point;
@@ -21,10 +14,13 @@ struct PointLight {
 };
 
 struct Intersectable {
-    vec3 data[3];
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
+    vec4 data[3];
+};
+
+struct Material {
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
 };
 
 struct Intersection {
@@ -33,27 +29,38 @@ struct Intersection {
     vec3 position;
 };
 
+layout (std140, binding = 2) uniform EyeCoords {
+    vec2 coord_scale;
+    vec2 coord_dims;
+    vec3 eye_pos;
+    mat3 eye_coord_frame;
+};
+
+layout (std140, binding = 3) uniform NumObjects {
+    int num_spheres;
+    int num_triangles;
+};
+
+layout (std430, binding = 4) buffer Intersectables {
+    Intersectable intersectables[];
+};
+
+layout (std430, binding = 5) buffer Materials {
+    Material materials[];
+};
+
 const PointLight lights[] = {
     PointLight(vec3(1.5, 2.5, -2.0), vec3(1.0, 0.045, 0.016)),
     PointLight(vec3(-1.5, 2.5, -2.0), vec3(1.0, 0.045, 0.016)),
     PointLight(vec3(0.0, 2.5, 2.0), vec3(1.0, 0.045, 0.016))
 };
 
-const Intersectable spheres[] = {
-    { { vec3(0.0, 1.0, 0.0), vec3(1.0), vec3(0.0) },
-        vec3(0.01, 0.1, 0.01), vec3(0.2, 0.3, 0.2), vec3(0.4, 0.7, 0.4) },
-    { { vec3(3.0, 1.0, 0.0), vec3(1.0), vec3(0.0) },
-        vec3(0.1, 0.01, 0.01), vec3(0.3, 0.2, 0.2), vec3(0.7, 0.4, 0.4) },
-    { { vec3(-3.0, 1.0, 0.0), vec3(1.0), vec3(0.0) },
-        vec3(0.01, 0.01, 0.1), vec3(0.2, 0.2, 0.3), vec3(0.4, 0.4, 0.7) }
-};
-
-const Intersectable triangles[] = {
-    { { vec3(5.0, 0.0, 5.0), vec3(5.0, 0.0, -5.0), vec3(-5.0, 0.0, -5.0)  },
-        vec3(0.01), vec3(0.2), vec3(0.2) },
-    { { vec3(5.0, 0.0, 5.0), vec3(-5.0, 0.0, -5.0), vec3(-5.0, 0.0, 5.0) },
-        vec3(0.01), vec3(0.2), vec3(0.2) }
-};
+void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
+    data_out[0] = data_in[0].xyz;
+    data_out[1] = data_in[1].xyz;
+    data_out[2] = data_in[2].xyz;
+    data_out[3] = vec3(data_in[0].w, data_in[1].w, data_in[2].w);
+}
 
 // Sphere intersection
 Intersection intersects(Ray ray, vec3 center, float radius) {
@@ -93,36 +100,31 @@ Intersection intersects(Ray ray, vec3 center, float radius) {
 }
 
 // Triangle intersection
-Intersection intersects(Ray ray, vec3 vertices[3]) {
-    const float epsilon = 1e-5;
-    vec3 e1 = vertices[1] - vertices[0];
-    vec3 e2 = vertices[2] - vertices[0];
+Intersection intersects(Ray ray, vec3 vertex, vec3 normal, vec3 edge1, vec3 edge2) {
+    float a = dot(-normal, ray.direction);
 
-    vec3 q = cross(ray.direction, e2);
-    float a = dot(e1, q);
-
-    if (abs(a) < epsilon) {
+    if (abs(a) < 1e-5) {
         return Intersection(false, 0.0, vec3(0.0));
     }
 
     float f = 1.0 / a;
-    vec3 s = ray.point - vertices[0];
-    float u = f * dot(s, q);
+    vec3 s = ray.point - vertex;
+    float t = f * dot(normal, s);
+
+    if (t < 0.0) {
+        return Intersection(false, 0.0, vec3(0.0));
+    }
+
+    vec3 m = cross(s, ray.direction);
+    float u = f * dot(m, edge2);
 
     if (u < 0.0) {
         return Intersection(false, 0.0, vec3(0.0));
     }
 
-    vec3 r = cross(s, e1);
-    float v = f * dot(ray.direction, r);
+    float v = f * dot(-m, edge1);
 
     if (v < 0.0 || u + v > 1.0) {
-        return Intersection(false, 0.0, vec3(0.0));
-    }
-
-    float t = f * dot(e2, r);
-
-    if (t < 0.0) {
         return Intersection(false, 0.0, vec3(0.0));
     }
 
@@ -130,14 +132,17 @@ Intersection intersects(Ray ray, vec3 vertices[3]) {
 }
 
 bool intersects_object_to_light(Ray ray, float light_distance) {
-    for (int i = 0; i < spheres.length(); i++) {
-        Intersection intersection = intersects(ray, spheres[i].data[0], spheres[i].data[1].x);
+    for (int i = 0; i < num_spheres; i++) {
+        vec4 center_radius = intersectables[i].data[0];
+        Intersection intersection = intersects(ray, center_radius.xyz, center_radius.w);
         if (intersection.intersects && intersection.distance < light_distance) {
             return true;
         }
     }
-    for (int i = 0; i < triangles.length(); i++) {
-        Intersection intersection = intersects(ray, triangles[i].data);
+    for (int i = num_spheres; i < num_triangles + num_spheres; i++) {
+        vec3 vne1e2[4];
+        unpack(intersectables[i].data, vne1e2);
+        Intersection intersection = intersects(ray, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
         if (intersection.intersects && intersection.distance < light_distance) {
             return true;
         }
@@ -148,49 +153,40 @@ bool intersects_object_to_light(Ray ray, float light_distance) {
 bool intersects_object(Ray ray, out Intersection min_intersection, out int object_i) {
     min_intersection = Intersection(false, 1.0 / 0.0, vec3(0.0));
 
-    for (int i = 0; i < spheres.length(); i++) {
-        Intersection intersection = intersects(ray, spheres[i].data[0], spheres[i].data[1].x);
+    for (int i = 0; i < num_spheres; i++) {
+        vec4 center_radius = intersectables[i].data[0];
+        Intersection intersection = intersects(ray, center_radius.xyz, center_radius.w);
         if (intersection.intersects && intersection.distance < min_intersection.distance) {
             min_intersection = intersection;
             object_i = i;
         }
     }
-    for (int i = 0; i < triangles.length(); i++) {
-        Intersection intersection = intersects(ray, triangles[i].data);
+    for (int i = num_spheres; i < num_triangles + num_spheres; i++) {
+        vec3 vne1e2[4];
+        unpack(intersectables[i].data, vne1e2);
+        Intersection intersection = intersects(ray, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
         if (intersection.intersects && intersection.distance < min_intersection.distance) {
             min_intersection = intersection;
-            object_i = i + spheres.length();
+            object_i = i;
         }
     }
 
     return min_intersection.intersects;
 }
 
-// Sphere normal
-vec3 normal(vec3 center, vec3 position) {
-    return normalize(position - center);
-}
-
-// Triangle normal
-vec3 normal(vec3 vertices[3], vec3 position) {
-    vec3 e1 = vertices[1] - vertices[0];
-    vec3 e2 = vertices[2] - vertices[0];
-    return normalize(cross(e1, e2));
-}
-
 vec3 calc_light_color(PointLight light, float light_distance, vec3 frag_pos,
-                      vec3 eye_pos, vec3 normal, Intersectable intersectable) {
+                      vec3 eye_pos, vec3 normal, Material material) {
     vec3 light_dir = normalize(light.position - frag_pos);
     vec3 eye_dir = normalize(eye_pos - frag_pos);
     vec3 half_vec = normalize(light_dir + eye_dir);
-    vec3 diffuse = intersectable.diffuse * max(dot(normal, light_dir), 0.0);
-    vec3 specular = intersectable.specular * pow(max(dot(normal, half_vec), 0.0), 32);
+    vec3 diffuse = material.diffuse.xyz * max(dot(normal, light_dir), 0.0);
+    vec3 specular = material.specular.xyz * pow(max(dot(normal, half_vec), 0.0), material.specular.w);
     return (diffuse + specular) /
             dot(light.attenuation, vec3(1.0, light_distance, light_distance * light_distance));
 }
 
 void main() {
-    const int RECURSION_DEPTH = 2;
+    const int RECURSION_DEPTH = 4;
 
     // Get coords and put into view and perspective
     const ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -218,23 +214,22 @@ void main() {
 
         // Find intersection
         if (!intersects_object(ray, intersection, object_i)) {
-            continue;
+            break;
         }
 
-        Intersectable intersectable;
+        Intersectable intersectable = intersectables[object_i];
+        Material material = materials[object_i];
         vec3 intersectable_normal;
 
         // Intersected triangle
-        if (object_i >= spheres.length()) {
-            intersectable = triangles[object_i - spheres.length()];
-            intersectable_normal = normal(intersectable.data, intersection.position);
+        if (object_i >= num_spheres) {
+            intersectable_normal = normalize(intersectable.data[1].xyz);
         // Intersected sphere
         } else {
-            intersectable = spheres[object_i];
-            intersectable_normal = normal(intersectable.data[0], intersection.position);
+            intersectable_normal = normalize(intersection.position - intersectable.data[0].xyz);
         }
 
-        vec3 current_color = intersectable.ambient;
+        vec3 current_color = material.ambient.xyz;
 
         // Calculate light contribution
         for (int i = 0; i < lights.length(); i++) {
@@ -249,7 +244,7 @@ void main() {
             if (!intersects_object_to_light(light_ray, ray_to_light_distance)) {
                 current_color += calc_light_color(lights[i], ray_to_light_distance,
                                                   intersection.position,
-                                                  eye_pos, intersectable_normal, intersectable);
+                                                  eye_pos, intersectable_normal, material);
             }
         }
 
@@ -258,7 +253,7 @@ void main() {
         ray_pos = intersection.position + ray_dir * 1e-2;
 
         color += reflectivity * current_color;
-        reflectivity *= intersectable.specular;
+        reflectivity *= material.specular.xyz;
     }
 
     imageStore(img_output, pixel_coords, vec4(color, 1.0));

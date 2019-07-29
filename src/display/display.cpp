@@ -15,23 +15,40 @@ Display::Display(std::shared_ptr<Camera> camera)
   rect.add_vertices(QUAD_VERTICES, 6, sizeof (QUAD_VERTICES));
   rect.add_vertex_attribs({ 2, 2 });
   rect.finalize_setup();
+
+  intersectable.add_sphere({ vec3(0.0f, 0.8f, 1.0f), 0.8f },
+                           { vec3(0.01f, 0.1f, 0.01f), vec3(0.2f, 0.3f, 0.2f), vec3(0.4f, 0.7f, 0.4f), 32 });
+  intersectable.add_sphere({ vec3(3.0f, 1.0f, 0.0f), 1.0f },
+                           { vec3(0.1f, 0.01f, 0.01f), vec3(0.3f, 0.2f, 0.2f), vec3(0.7f, 0.4f, 0.4f), 32 });
+  intersectable.add_sphere({ vec3(-3.0f, 0.5f, -0.5f), 0.5f },
+                           { vec3(0.01f, 0.01f, 0.1f), vec3(0.2f, 0.2f, 0.3f), vec3(0.4f, 0.4f, 0.7f), 32 });
+  intersectable.add_sphere({ vec3(1.0f, 0.75f, -2.0f), 0.75f },
+                           { vec3(0.1f, 0.1f, 0.01f), vec3(0.3f, 0.3f, 0.2f), vec3(0.7f, 0.7f, 0.4f), 32 });
+  intersectable.add_sphere({ vec3(-2.0f, 0.6f, -3.0f), 0.6f },
+                           { vec3(0.0f), vec3(0.0f), vec3(0.8f), 255 });
+
+  intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, -8.0f) },
+                             { vec3(0.01f), vec3(0.2f), vec3(0.2f), 32 });
+  intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
+                             { vec3(0.01f), vec3(0.2f), vec3(0.2f), 32 });
+  intersectable.finalize();
 }
 
 void Display::draw() const
 {
-  PROFILE_SCOPE("Draw")
+  PROFILE_SCOPE("Draw");
 
-  PROFILE_SECTION_START("Update Camera")
+  PROFILE_SECTION_START("Update Camera");
   camera->update_frames();
-  PROFILE_SECTION_END()
+  PROFILE_SECTION_END();
 
-  PROFILE_SECTION_START("Compute raytracing")
+  PROFILE_SECTION_START("Compute raytracing");
   compute_shader.use();
   compute_shader.dispatch_compute();
-  PROFILE_SECTION_END()
+  PROFILE_SECTION_END();
 
-  PROFILE_SECTION_START("Draw to screen")
-  image.use(rect_shader);
+  PROFILE_SECTION_START("Draw to screen");
+  image.use();
   rect.draw(rect_shader);
-  PROFILE_SECTION_END()
+  PROFILE_SECTION_END();
 }

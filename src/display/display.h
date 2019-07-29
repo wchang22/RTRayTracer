@@ -2,6 +2,7 @@
 #define DISPLAY_H
 
 #include "model/object.h"
+#include "model/intersectable.h"
 #include "shader/shader.h"
 #include "shader/image.h"
 #include "display/camera.h"
@@ -20,6 +21,7 @@ private:
   Shader rect_shader;
   Shader compute_shader;
   Image image;
+  Intersectable intersectable;
 };
 
 #endif // DISPLAY_H

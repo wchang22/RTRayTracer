@@ -13,8 +13,8 @@ Window::Window()
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  width = 1000;
-  height = 650;
+  width = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
+  height = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
   window = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
 
   if (!window) {
@@ -56,24 +56,21 @@ Window::~Window() {
 void Window::main_loop() {
   try {
     while (!glfwWindowShouldClose(window)) {
-      PROFILE_SCOPE("Main Loop")
+      PROFILE_SCOPE("Main Loop");
 
-      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
-
-      PROFILE_SECTION_START("Display draw")
+      PROFILE_SECTION_START("Display draw");
       display->draw();
-      PROFILE_SECTION_END()
+      PROFILE_SECTION_END();
 
-      PROFILE_SECTION_START("Swap buffers")
+      PROFILE_SECTION_START("Swap buffers");
       glfwSwapBuffers(window);
-      PROFILE_SECTION_END()
+      PROFILE_SECTION_END();
 
-      PROFILE_SECTION_START("I/O Events")
+      PROFILE_SECTION_START("I/O Events");
       glfwPollEvents();
       key_callback();
       mouse_callback();
-      PROFILE_SECTION_END()
+      PROFILE_SECTION_END();
     }
   } catch (...) {
     glfwDestroyWindow(window);
