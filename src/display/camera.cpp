@@ -6,9 +6,9 @@
 #include <GLFW/glfw3.h>
 
 Camera::Camera(vec3 position, vec3 forward, vec3 up, int width, int height, float fovy)
-  : up(up),
+  : up(glm::normalize(up)),
     position(position),
-    forward(forward),
+    forward(glm::normalize(forward)),
     fovy(fovy),
     width(width),
     height(height)
@@ -119,4 +119,12 @@ vec3 Camera::get_position() const {
 
 vec3 Camera::get_direction() const {
   return forward;
+}
+
+void Camera::circle()
+{
+  update_position(vec3(6.0f * static_cast<float>(cos(glfwGetTime() / 2.0)),
+                       4.0f,
+                       6.0f * static_cast<float>(sin(glfwGetTime() / 2.0))));
+  update_direction(vec3(0.0f, 0.0f, 0.0f) - get_position());
 }

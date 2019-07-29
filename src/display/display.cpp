@@ -22,10 +22,6 @@ void Display::draw() const
   PROFILE_SCOPE("Draw")
 
   PROFILE_SECTION_START("Update Camera")
-  camera->update_position(vec3(5.0f * static_cast<float>(cos(glfwGetTime() / 2.0)),
-                               3.0f,
-                               5.0f * static_cast<float>(sin(glfwGetTime() / 2.0))));
-  camera->update_direction(vec3(0.0f, -0.5f, 0.0f) - camera->get_position());
   camera->update_frames();
   PROFILE_SECTION_END()
 

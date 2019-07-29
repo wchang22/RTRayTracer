@@ -31,6 +31,7 @@ public:
   void update_position(vec3 position);
   vec3 get_position() const;
   vec3 get_direction() const;
+  void circle();
 
 private:
   vec3 up;

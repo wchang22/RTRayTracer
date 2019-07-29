@@ -13,8 +13,8 @@ Window::Window()
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  width = glfwGetVideoMode(glfwGetPrimaryMonitor())->width;
-  height = glfwGetVideoMode(glfwGetPrimaryMonitor())->height;
+  width = 1000;
+  height = 650;
   window = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
 
   if (!window) {
@@ -35,7 +35,7 @@ Window::Window()
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  camera = std::make_shared<Camera>(vec3(0.0f, 0.0f, 4.0f),
+  camera = std::make_shared<Camera>(vec3(0.0f, 3.0f, 8.0f),
                                     vec3(0.0f, 0.0f, -1.0f),
                                     vec3(0.0f, 1.0f, 0.0f),
                                     width, height, 45.0f);
