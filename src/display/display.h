@@ -3,6 +3,7 @@
 
 #include "model/object.h"
 #include "model/intersectable.h"
+#include "model/light.h"
 #include "shader/shader.h"
 #include "shader/image.h"
 #include "display/camera.h"
@@ -22,6 +23,7 @@ private:
   Shader compute_shader;
   Image image;
   Intersectable intersectable;
+  Light light;
 };
 
 #endif // DISPLAY_H

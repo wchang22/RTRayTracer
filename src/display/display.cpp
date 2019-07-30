@@ -32,6 +32,13 @@ Display::Display(std::shared_ptr<Camera> camera)
   intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
                              { vec3(0.01f), vec3(0.2f), vec3(0.2f), 32 });
   intersectable.finalize();
+
+  light.add_point_light({ vec3(1.5, 2.5, -2.0), vec3(1.0, 0.045, 0.016) });
+  light.add_point_light({ vec3(-1.5, 2.5, -2.0), vec3(1.0, 0.045, 0.016) });
+  light.add_point_light({ vec3(0.0, 2.5, 2.0), vec3(1.0, 0.045, 0.016) });
+  light.add_point_light({ vec3(-3.0, 10.0, 1.0), vec3(1.0, 0.09, 0.032) });
+  light.add_point_light({ vec3(4.0, 10.0, -4.0), vec3(1.0, 0.09, 0.032) });
+  light.finalize();
 }
 
 void Display::draw() const
