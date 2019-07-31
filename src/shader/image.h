@@ -3,16 +3,21 @@
 
 #include "shader/shader.h"
 
+#include <glad/glad.h>
+#include <vector>
+
 class Image
 {
 public:
   Image(int width, int height);
   ~Image();
 
-  void use() const;
+  void add_image(GLenum image_format, bool read = true, bool write = true);
+  void use(const Shader& shader) const;
 
 private:
-  unsigned int texture;
+  std::vector<unsigned int> textures;
+  int width, height;
 };
 
 #endif // IMAGE_H

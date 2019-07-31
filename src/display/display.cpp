@@ -11,6 +11,8 @@ Display::Display(std::shared_ptr<Camera> camera)
                    static_cast<unsigned int>(Window::get_height()), 1),
     image(Window::get_width(), Window::get_height())
 {
+  image.add_image(GL_RGBA8, false, true);
+
   rect.start_setup();
   rect.add_vertices(QUAD_VERTICES, 6, sizeof (QUAD_VERTICES));
   rect.add_vertex_attribs({ 2, 2 });
@@ -55,7 +57,7 @@ void Display::draw() const
   PROFILE_SECTION_END();
 
   PROFILE_SECTION_START("Draw to screen");
-  image.use();
+  image.use(rect_shader);
   rect.draw(rect_shader);
   PROFILE_SECTION_END();
 }
