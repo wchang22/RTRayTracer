@@ -6,6 +6,8 @@ layout (rgba8, binding = 0) uniform writeonly restrict image2D img_output;
 struct Ray {
     vec3 point;
     vec3 direction;
+    float length;
+    int intersectable;
 };
 
 struct Light {
@@ -21,12 +23,6 @@ struct Material {
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;
-};
-
-struct Intersection {
-    bool intersects;
-    float distance;
-    vec3 position;
 };
 
 layout (std140, binding = 2) uniform EyeCoords {
@@ -64,8 +60,12 @@ void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
     data_out[3] = vec3(data_in[0].w, data_in[1].w, data_in[2].w);
 }
 
+Ray create_ray(vec3 point, vec3 direction) {
+    return Ray(point, direction, 1.0 / 0.0, -1);
+}
+
 // Sphere intersection
-Intersection intersects(Ray ray, vec3 center, float radius) {
+bool intersects(inout Ray ray, int intersectable, vec3 center, float radius) {
     // offset of sphere center from ray point
     vec3 l = center - ray.point;
     // projection of l onto ray direction
@@ -75,7 +75,7 @@ Intersection intersects(Ray ray, vec3 center, float radius) {
 
     // sphere is behind ray
     if (s < 0.0 && l2 > r2) {
-        return Intersection(false, 0.0, vec3(0.0));
+        return false;
     }
 
     // distance from center to ray
@@ -83,7 +83,7 @@ Intersection intersects(Ray ray, vec3 center, float radius) {
 
     // ray misses sphere
     if (m2 > r2) {
-        return Intersection(false, 0.0, vec3(0.0));
+        return false;
     }
 
     // distance to sphere edge
@@ -98,82 +98,80 @@ Intersection intersects(Ray ray, vec3 center, float radius) {
         t = s + q;
     }
 
-    return Intersection(true, t, ray.point + t * ray.direction);
+    if (t > ray.length) {
+        return false;
+    }
+
+    ray.length = t;
+    ray.intersectable = intersectable;
+    return true;
 }
 
 // Triangle intersection
-Intersection intersects(Ray ray, vec3 vertex, vec3 normal, vec3 edge1, vec3 edge2) {
+bool intersects(inout Ray ray, int intersectable, vec3 vertex, vec3 normal, vec3 edge1, vec3 edge2) {
     float a = dot(-normal, ray.direction);
 
     if (abs(a) < 1e-5) {
-        return Intersection(false, 0.0, vec3(0.0));
+        return false;
     }
 
     float f = 1.0 / a;
     vec3 s = ray.point - vertex;
     float t = f * dot(normal, s);
 
-    if (t < 0.0) {
-        return Intersection(false, 0.0, vec3(0.0));
+    if (t < 0.0 || t > ray.length) {
+        return false;
     }
 
     vec3 m = cross(s, ray.direction);
     float u = f * dot(m, edge2);
 
     if (u < 0.0) {
-        return Intersection(false, 0.0, vec3(0.0));
+        return false;
     }
 
     float v = f * dot(-m, edge1);
 
     if (v < 0.0 || u + v > 1.0) {
-        return Intersection(false, 0.0, vec3(0.0));
+        return false;
     }
 
-    return Intersection(true, t, ray.point + t * ray.direction);
+    ray.length = t;
+    ray.intersectable = intersectable;
+    return true;
 }
 
-bool intersects_object_to_light(Ray ray, float light_distance) {
+bool intersects_object_to_light(inout Ray light_ray, float light_distance) {
     for (int i = 0; i < num_spheres; i++) {
         vec4 center_radius = intersectables[i].data[0];
-        Intersection intersection = intersects(ray, center_radius.xyz, center_radius.w);
-        if (intersection.intersects && intersection.distance < light_distance) {
+        intersects(light_ray, i, center_radius.xyz, center_radius.w);
+        if (light_ray.length < light_distance) {
             return true;
         }
     }
     for (int i = num_spheres; i < num_triangles + num_spheres; i++) {
         vec3 vne1e2[4];
         unpack(intersectables[i].data, vne1e2);
-        Intersection intersection = intersects(ray, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
-        if (intersection.intersects && intersection.distance < light_distance) {
+        intersects(light_ray, i, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
+        if (light_ray.length < light_distance) {
             return true;
         }
     }
     return false;
 }
 
-bool intersects_object(Ray ray, out Intersection min_intersection, out int object_i) {
-    min_intersection = Intersection(false, 1.0 / 0.0, vec3(0.0));
-
+bool intersects_object(inout Ray ray) {
     for (int i = 0; i < num_spheres; i++) {
         vec4 center_radius = intersectables[i].data[0];
-        Intersection intersection = intersects(ray, center_radius.xyz, center_radius.w);
-        if (intersection.intersects && intersection.distance < min_intersection.distance) {
-            min_intersection = intersection;
-            object_i = i;
-        }
+        intersects(ray, i, center_radius.xyz, center_radius.w);
     }
     for (int i = num_spheres; i < num_triangles + num_spheres; i++) {
         vec3 vne1e2[4];
         unpack(intersectables[i].data, vne1e2);
-        Intersection intersection = intersects(ray, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
-        if (intersection.intersects && intersection.distance < min_intersection.distance) {
-            min_intersection = intersection;
-            object_i = i;
-        }
+        intersects(ray, i, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
     }
 
-    return min_intersection.intersects;
+    return ray.intersectable != -1;
 }
 
 vec3 calc_light_color(Light light, float light_distance, vec3 frag_pos,
@@ -204,50 +202,48 @@ void main() {
     vec3 color = vec3(0.0);
 
     for (int i = 0; i < RECURSION_DEPTH; i++) {
-        Ray ray = Ray(ray_pos, ray_dir);
-
-        Intersection intersection;
-        int object_i;
+        Ray ray = create_ray(ray_pos, ray_dir);
 
         // Find intersection
-        if (!intersects_object(ray, intersection, object_i)) {
+        if (!intersects_object(ray)) {
             break;
         }
 
-        Intersectable intersectable = intersectables[object_i];
-        Material material = materials[object_i];
+        vec3 intersection = ray.point + ray.length * ray.direction;
+        Intersectable intersectable = intersectables[ray.intersectable];
+        Material material = materials[ray.intersectable];
         vec3 intersectable_normal;
 
         // Intersected triangle
-        if (object_i >= num_spheres) {
+        if (ray.intersectable >= num_spheres) {
             intersectable_normal = normalize(intersectable.data[1].xyz);
         // Intersected sphere
         } else {
-            intersectable_normal = normalize(intersection.position - intersectable.data[0].xyz);
+            intersectable_normal = normalize(intersection - intersectable.data[0].xyz);
         }
 
         vec3 current_color = material.ambient.xyz;
 
         // Calculate light contribution
         for (int i = 0; i < num_point_lights; i++) {
-            vec3 ray_to_light_dir = lights[i].position.xyz - intersection.position;
+            vec3 ray_to_light_dir = lights[i].position.xyz - intersection;
             float ray_to_light_distance = length(ray_to_light_dir);
             ray_to_light_dir = normalize(ray_to_light_dir);
             // Bias intersection position up a bit to prevent self-intersection
-            vec3 ray_to_light_point = intersection.position + ray_to_light_dir * 1e-2;
-            Ray light_ray = Ray(ray_to_light_point, ray_to_light_dir);
+            vec3 ray_to_light_point = intersection + ray_to_light_dir * 1e-2;
+            Ray light_ray = create_ray(ray_to_light_point, ray_to_light_dir);
 
             // If the light ray is not blocked by any object, calculate color
             if (!intersects_object_to_light(light_ray, ray_to_light_distance)) {
                 current_color += calc_light_color(lights[i], ray_to_light_distance,
-                                                  intersection.position,
+                                                  intersection,
                                                   eye_pos, intersectable_normal, material);
             }
         }
 
         // Ray is now reflected off intersection point
         ray_dir = reflect(ray_dir, intersectable_normal);
-        ray_pos = intersection.position + ray_dir * 1e-2;
+        ray_pos = intersection + ray_dir * 1e-2;
 
         color += reflectivity * current_color;
         reflectivity *= material.specular.xyz;
