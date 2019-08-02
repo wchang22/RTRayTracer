@@ -28,14 +28,23 @@ public:
     float radius;
   };
 
+  struct AxisAlignedBox {
+    vec3 center;
+    float x;
+    float y;
+    float z;
+  };
+
   void add_triangle(Triangle&& triangle, Material&& material);
   void add_sphere(Sphere&& sphere, Material&& material);
+  void add_axis_aligned_box(AxisAlignedBox&& aabb, Material&& material);
   void finalize();
 
 private:
   unsigned int intersectables, num_intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;
   std::vector<std::pair<Sphere, Material>> spheres;
+  std::vector<std::pair<AxisAlignedBox, Material>> aabbs;
 };
 
 #endif // INTERSECTABLE_H

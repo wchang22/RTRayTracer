@@ -33,6 +33,12 @@ Display::Display(std::shared_ptr<Camera> camera)
                              { vec3(0.01f), vec3(0.2f), vec3(0.2f), 32 });
   intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
                              { vec3(0.01f), vec3(0.2f), vec3(0.2f), 32 });
+
+  intersectable.add_axis_aligned_box(
+    { vec3(-1.0f, 1.00001f, -1.0f), 1.0f, 2.0f, 1.0f },
+    { vec3(0.01f, 0.1f, 0.01f), vec3(0.4f, 0.3f, 0.4f), vec3(0.5f, 0.2f, 0.5f), 32 }
+  );
+
   intersectable.finalize();
 
   light.add_point_light({ vec3(1.5, 2.5, -2.0), vec3(1.0, 0.045, 0.016) });

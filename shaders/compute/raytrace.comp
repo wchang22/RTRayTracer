@@ -35,6 +35,7 @@ layout (std140, binding = 2) uniform EyeCoords {
 layout (std140, binding = 3) uniform NumObjects {
     int num_spheres;
     int num_triangles;
+    int num_aabbs;
 };
 
 layout (std430, binding = 4) buffer Intersectables {
@@ -65,13 +66,12 @@ Ray create_ray(vec3 point, vec3 direction) {
 }
 
 // Sphere intersection
-bool intersects(inout Ray ray, int intersectable, vec3 center, float radius) {
+bool intersects(inout Ray ray, int intersectable, vec3 center, float r2) {
     // offset of sphere center from ray point
     vec3 l = center - ray.point;
     // projection of l onto ray direction
     float s = dot(l, ray.direction);
     float l2 = dot(l, l);
-    float r2 = radius * radius;
 
     // sphere is behind ray
     if (s < 0.0 && l2 > r2) {
@@ -98,7 +98,7 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, float radius) {
         t = s + q;
     }
 
-    if (t > ray.length) {
+    if (t >= ray.length) {
         return false;
     }
 
@@ -111,15 +111,11 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, float radius) {
 bool intersects(inout Ray ray, int intersectable, vec3 vertex, vec3 normal, vec3 edge1, vec3 edge2) {
     float a = dot(-normal, ray.direction);
 
-    if (abs(a) < 1e-5) {
-        return false;
-    }
-
     float f = 1.0 / a;
     vec3 s = ray.point - vertex;
     float t = f * dot(normal, s);
 
-    if (t < 0.0 || t > ray.length) {
+    if (t < 0.0 || t >= ray.length) {
         return false;
     }
 
@@ -141,10 +137,36 @@ bool intersects(inout Ray ray, int intersectable, vec3 vertex, vec3 normal, vec3
     return true;
 }
 
+// AABB intersection
+bool intersects(inout Ray ray, int intersectable, vec3 center, vec3 halfs) {
+    vec3 p = center - ray.point;
+    vec3 inv_dir = 1.0 / ray.direction;
+
+    // Find slab bounds on AABB
+    vec3 t1 = (p + halfs) * inv_dir;
+    vec3 t2 = (p - halfs) * inv_dir;
+    vec3 tvmin = min(t1, t2);
+    vec3 tvmax = max(t1, t2);
+
+    // Find tighest components of min and max
+    float tmin = max(tvmin[0], max(tvmin[1], tvmin[2]));
+    float tmax = min(tvmax[0], min(tvmax[1], tvmax[2]));
+
+    // Determine if ray misses, is in front of AABB or if intersection is not closer
+    // than an existing one
+    if (tmin > tmax || tmax < 0 || tmin >= ray.length) {
+        return false;
+    }
+
+    ray.length = tmin > 0 ? tmin : tmax;
+    ray.intersectable = intersectable;
+    return true;
+}
+
 bool intersects_object_to_light(inout Ray light_ray, float light_distance) {
     for (int i = 0; i < num_spheres; i++) {
-        vec4 center_radius = intersectables[i].data[0];
-        intersects(light_ray, i, center_radius.xyz, center_radius.w);
+        vec4 center_r2 = intersectables[i].data[0];
+        intersects(light_ray, i, center_r2.xyz, center_r2.w);
         if (light_ray.length < light_distance) {
             return true;
         }
@@ -157,18 +179,27 @@ bool intersects_object_to_light(inout Ray light_ray, float light_distance) {
             return true;
         }
     }
+    for (int i = num_triangles + num_spheres; i < num_triangles + num_spheres + num_aabbs; i++) {
+        intersects(light_ray, i, intersectables[i].data[0].xyz, intersectables[i].data[1].xyz);
+        if (light_ray.length < light_distance) {
+            return true;
+        }
+    }
     return false;
 }
 
 bool intersects_object(inout Ray ray) {
     for (int i = 0; i < num_spheres; i++) {
-        vec4 center_radius = intersectables[i].data[0];
-        intersects(ray, i, center_radius.xyz, center_radius.w);
+        vec4 center_r2 = intersectables[i].data[0];
+        intersects(ray, i, center_r2.xyz, center_r2.w);
     }
     for (int i = num_spheres; i < num_triangles + num_spheres; i++) {
         vec3 vne1e2[4];
         unpack(intersectables[i].data, vne1e2);
         intersects(ray, i, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
+    }
+    for (int i = num_triangles + num_spheres; i < num_triangles + num_spheres + num_aabbs; i++) {
+        intersects(ray, i, intersectables[i].data[0].xyz, intersectables[i].data[1].xyz);
     }
 
     return ray.intersectable != -1;
@@ -214,11 +245,21 @@ void main() {
         Material material = materials[ray.intersectable];
         vec3 intersectable_normal;
 
+        // Intersected box
+        if (ray.intersectable >= num_spheres + num_triangles) {
+            // p is the vector from the center to intersection point
+            vec3 p = abs(intersection - intersectable.data[0].xyz);
+            // h is the vector of half lengths
+            vec3 h = intersectable.data[1].xyz;
+            // At the intersection point, the normal will be the component of p
+            // that is roughly the same as the corresponding component of h
+            intersectable_normal = normalize(floor(p / h + 1e-4));
         // Intersected triangle
-        if (ray.intersectable >= num_spheres) {
+        } else if (ray.intersectable >= num_spheres) {
             intersectable_normal = normalize(intersectable.data[1].xyz);
         // Intersected sphere
         } else {
+            // Normal is simply the vector from center to intersection point
             intersectable_normal = normalize(intersection - intersectable.data[0].xyz);
         }
 

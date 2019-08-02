@@ -26,54 +26,72 @@ void Intersectable::add_sphere(Intersectable::Sphere&& sphere, Intersectable::Ma
   spheres.emplace_back(std::move(sphere), std::move(material));
 }
 
+void Intersectable::add_axis_aligned_box(Intersectable::AxisAlignedBox&& aabb,
+                                         Intersectable::Material&& material)
+{
+  aabbs.emplace_back(std::move(aabb), std::move(material));
+}
+
 void Intersectable::finalize()
 {
-  const int num_objects[2] = { static_cast<int>(spheres.size()),
-                               static_cast<int>(triangles.size()) };
+  const std::vector<int> num_objects = {
+    static_cast<int>(spheres.size()),
+    static_cast<int>(triangles.size()),
+    static_cast<int>(aabbs.size())
+  };
+  const size_t total_size = spheres.size() + triangles.size() + aabbs.size();
+  constexpr size_t intersectable_stride = 3;
 
   glBindBuffer(GL_UNIFORM_BUFFER, num_intersectables);
-  glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof (int), num_objects, GL_STATIC_DRAW);
+  glBufferData(GL_UNIFORM_BUFFER, static_cast<long>(num_objects.size() * sizeof (int)),
+               num_objects.data(), GL_STATIC_DRAW);
   glBindBufferBase(GL_UNIFORM_BUFFER, 3, num_intersectables);
 
   std::vector<vec4> intersectable_data;
   std::vector<vec4> material_data;
-  intersectable_data.reserve((spheres.size() + triangles.size()) * 3);
-  material_data.reserve((spheres.size() + triangles.size()) * 3);
+  intersectable_data.reserve(total_size * intersectable_stride);
+  material_data.reserve(total_size * intersectable_stride);
 
-  for (unsigned int i = 0; i < spheres.size(); i++) {
-    const auto& [sphere, material] = spheres[i];
-    intersectable_data.emplace_back(vec4(sphere.center, sphere.radius));
-    intersectable_data.insert(intersectable_data.end(), {{}, {}});
+  const auto add_material = [&material_data](const Material& material) {
     material_data.emplace_back(vec4(material.ambient, 0.0));
     material_data.emplace_back(vec4(material.diffuse, 0.0));
     material_data.emplace_back(vec4(material.specular, material.shininess));
+  };
+
+  for (const auto& [sphere, material] : spheres) {
+    intersectable_data.emplace_back(vec4(sphere.center, sphere.radius * sphere.radius));
+    intersectable_data.insert(intersectable_data.end(), {{}, {}});
+    add_material(material);
   }
 
-  for (unsigned int i = static_cast<unsigned int>(spheres.size());
-     i < triangles.size() + spheres.size(); i++) {
-    const auto& [triangle, material] = triangles[i - spheres.size()];
+  for (const auto& [triangle, material] : triangles) {
     vec3 e1 = triangle.vertices[1] - triangle.vertices[0];
     vec3 e2 = triangle.vertices[2] - triangle.vertices[0];
     vec3 n = glm::cross(e1, e2);
     intersectable_data.emplace_back(vec4(triangle.vertices[0], e2.x));
     intersectable_data.emplace_back(vec4(n, e2.y));
     intersectable_data.emplace_back(vec4(e1, e2.z));
-    material_data.emplace_back(vec4(material.ambient, 0.0));
-    material_data.emplace_back(vec4(material.diffuse, 0.0));
-    material_data.emplace_back(vec4(material.specular, material.shininess));
+    add_material(material);
+  }
+
+  for (const auto& [aabb, material] : aabbs) {
+    intersectable_data.emplace_back(vec4(aabb.center, 0.0));
+    intersectable_data.emplace_back(vec4(aabb.x / 2.0f, aabb.y / 2.0f, aabb.z / 2.0f, 0.0));
+    intersectable_data.emplace_back();
+    add_material(material);
   }
 
   constexpr GLenum buffer_type = GL_SHADER_STORAGE_BUFFER;
 
   glBindBuffer(buffer_type, intersectables);
   glBufferStorage(buffer_type,
-                  static_cast<long>((spheres.size() + triangles.size()) * 3 * sizeof (vec4)),
+                  static_cast<long>(total_size * intersectable_stride * sizeof (vec4)),
                   intersectable_data.data(), 0);
   glBindBufferBase(buffer_type, 4, intersectables);
 
   glBindBuffer(buffer_type, materials);
   glBufferStorage(buffer_type,
-                  static_cast<long>((spheres.size() + triangles.size()) * 3 * sizeof (vec4)),
+                  static_cast<long>(total_size * intersectable_stride * sizeof (vec4)),
                   material_data.data(), 0);
   glBindBufferBase(buffer_type, 5, materials);
 
