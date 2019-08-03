@@ -27,19 +27,21 @@ void Light::finalize()
   glBufferData(GL_UNIFORM_BUFFER, sizeof (int), &num_point_lights, GL_STATIC_DRAW);
   glBindBufferBase(GL_UNIFORM_BUFFER, 6, num_lights);
 
+  constexpr unsigned int light_stride = 2;
+
   std::vector<vec4> light_data;
-  light_data.reserve(point_lights.size() * 2);
+  light_data.reserve(point_lights.size() * light_stride);
 
   for (const auto& light : point_lights) {
     light_data.emplace_back(vec4(light.position, 0.0));
-    light_data.emplace_back(vec4(light.attenuation, 0.0));
+    light_data.emplace_back(vec4(light.color, 0.0));
   }
 
   constexpr GLenum buffer_type = GL_SHADER_STORAGE_BUFFER;
 
   glBindBuffer(buffer_type, lights);
   glBufferStorage(buffer_type,
-                  static_cast<long>(point_lights.size() * 2 * sizeof (vec4)),
+                  static_cast<long>(point_lights.size() * light_stride * sizeof (vec4)),
                   light_data.data(), 0);
   glBindBufferBase(buffer_type, 7, lights);
 

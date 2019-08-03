@@ -12,7 +12,7 @@ struct Ray {
 
 struct Light {
     vec4 position;
-    vec4 attenuation;
+    vec4 color;
 };
 
 struct Intersectable {
@@ -20,9 +20,9 @@ struct Intersectable {
 };
 
 struct Material {
-    vec4 ambient;
-    vec4 diffuse;
-    vec4 specular;
+    vec4 albedo;
+    vec4 mra;
+    vec4 reflectance;
 };
 
 layout (std140, binding = 2) uniform EyeCoords {
@@ -54,6 +54,9 @@ layout (std430, binding = 7) buffer Lights {
     Light lights[];
 };
 
+const float PI = 3.14159265359;
+const float inv_PI = 1.0 / PI;
+
 void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
     data_out[0] = data_in[0].xyz;
     data_out[1] = data_in[1].xyz;
@@ -62,7 +65,7 @@ void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
 }
 
 Ray create_ray(vec3 point, vec3 direction) {
-    return Ray(point, direction, 1.0 / 0.0, -1);
+    return Ray(point + direction * 1e-2, direction, 1.0 / 0.0, -1);
 }
 
 // Sphere intersection
@@ -89,14 +92,8 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, float r2) {
     // distance to sphere edge
     float q = sqrt(r2 - m2);
 
-    float t;
-    // ray originates outside sphere
-    if (l2 > r2) {
-        t = s - q;
-    // ray originates inside sphere
-    } else {
-        t = s + q;
-    }
+    // determine if ray originates outside/inside sphere
+    float t = s + (l2 > r2 ? -q : q);
 
     if (t >= ray.length) {
         return false;
@@ -149,8 +146,8 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, vec3 halfs) {
     vec3 tvmax = max(t1, t2);
 
     // Find tighest components of min and max
-    float tmin = max(tvmin[0], max(tvmin[1], tvmin[2]));
-    float tmax = min(tvmax[0], min(tvmax[1], tvmax[2]));
+    float tmin = max(tvmin.x, max(tvmin.y, tvmin.z));
+    float tmax = min(tvmax.x, min(tvmax.y, tvmax.z));
 
     // Determine if ray misses, is in front of AABB or if intersection is not closer
     // than an existing one
@@ -205,19 +202,73 @@ bool intersects_object(inout Ray ray) {
     return ray.intersectable != -1;
 }
 
-vec3 calc_light_color(Light light, float light_distance, vec3 frag_pos,
-                      vec3 eye_pos, vec3 normal, Material material) {
-    vec3 light_dir = normalize(light.position.xyz - frag_pos);
-    vec3 eye_dir = normalize(eye_pos - frag_pos);
-    vec3 half_vec = normalize(light_dir + eye_dir);
-    vec3 diffuse = material.diffuse.xyz * max(dot(normal, light_dir), 0.0);
-    vec3 specular = material.specular.xyz * pow(max(dot(normal, half_vec), 0.0), material.specular.w);
-    return (diffuse + specular) /
-            dot(light.attenuation.xyz, vec3(1.0, light_distance, light_distance * light_distance));
+vec3 fresnel_schlick(float cos_theta, vec3 f0) {
+    return f0 + (1.0 - f0) * pow(1.0 - cos_theta, 5.0);
+}
+
+float distribution_ggx(float n_dot_h_2, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+
+    float denom = n_dot_h_2 * (a2 - 1.0) + 1.0;
+    denom = PI * denom * denom;
+
+    return a2 / denom;
+}
+
+float geometry_smith(float n_dot_v, float n_dot_l, float nvl, float roughness) {
+    float r = roughness + 1.0;
+    float k = r * r / 8.0;
+    float m = 1.0 - k;
+
+    return nvl / ((n_dot_v * m + k) * (n_dot_l * m + k));
+}
+
+vec3 calc_color(vec3 source_pos, vec3 source_color, float source_dist2,
+                vec3 eye_pos, vec3 frag_pos, vec3 frag_normal, Material frag_material) {
+    vec3 light_dir = normalize(source_pos - frag_pos);
+    vec3 view_dir = normalize(eye_pos - frag_pos);
+    vec3 half_vec = normalize(light_dir + view_dir);
+
+    float n_dot_v = max(dot(frag_normal, view_dir), 0.0);
+    float n_dot_l = max(dot(frag_normal, light_dir), 0.0);
+    float n_dot_h = max(dot(frag_normal, half_vec), 0.0);
+    float h_dot_v = max(dot(half_vec, view_dir), 0.0);
+    float nvl = n_dot_v * n_dot_l;
+    float n_dot_h_2 = n_dot_h * n_dot_h;
+
+    vec3 albedo = frag_material.albedo.xyz;
+    float metallic = frag_material.mra.x;
+    float roughness = frag_material.mra.y;
+
+    // normal distribution function
+    float d = distribution_ggx(n_dot_h_2, roughness);
+    // fresnel equation
+    vec3 f = fresnel_schlick(h_dot_v, mix(vec3(0.04), albedo, metallic));
+    // geometry function
+    float g = geometry_smith(n_dot_v, n_dot_l, nvl, roughness);
+
+    // specularity
+    vec3 kS = f;
+    // diffuse
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+
+    vec3 brdf = kD * albedo * inv_PI + d * f * g / max(4.0 * nvl, 1e-3);
+    vec3 radiance = source_color / max(source_dist2, 1.0);
+
+    return brdf * radiance * n_dot_l;
+}
+
+vec3 tone_mapping(vec3 color) {
+    return color / (color + 1.0);
+}
+
+vec3 gamma_correct(vec3 color) {
+    return pow(color, vec3(1.0 / 2.2));
 }
 
 void main() {
-    const int RECURSION_DEPTH = 4;
+    const int MAX_RECURSION_DEPTH = 4;
 
     // Get coords and put into view and perspective
     const ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
@@ -229,10 +280,10 @@ void main() {
                                             eye_coord_frame[2]);
     vec3 ray_pos = eye_pos;
 
-    vec3 reflectivity = vec3(1.0);
     vec3 color = vec3(0.0);
+    vec3 reflectance = vec3(1.0);
 
-    for (int i = 0; i < RECURSION_DEPTH; i++) {
+    for (int recursion_depth = 0; recursion_depth < MAX_RECURSION_DEPTH; recursion_depth++) {
         Ray ray = create_ray(ray_pos, ray_dir);
 
         // Find intersection
@@ -240,60 +291,56 @@ void main() {
             break;
         }
 
-        vec3 intersection = ray.point + ray.length * ray.direction;
+        vec3 intersection_position = ray.point + ray.length * ray.direction;
         Intersectable intersectable = intersectables[ray.intersectable];
-        Material material = materials[ray.intersectable];
-        vec3 intersectable_normal;
+        Material intersection_material = materials[ray.intersectable];
+        vec3 intersection_normal;
 
+        // Intersected sphere
+        if (ray.intersectable < num_spheres) {
+            // Normal is simply the vector from center to intersection point
+            intersection_normal = normalize(intersection_position - intersectable.data[0].xyz);
+        // Intersected triangle
+        } else if (ray.intersectable < num_spheres + num_triangles) {
+            intersection_normal = normalize(intersectable.data[1].xyz);
         // Intersected box
-        if (ray.intersectable >= num_spheres + num_triangles) {
+        } else {
             // p is the vector from the center to intersection point
-            vec3 p = abs(intersection - intersectable.data[0].xyz);
+            vec3 p = abs(intersection_position - intersectable.data[0].xyz);
             // h is the vector of half lengths
             vec3 h = intersectable.data[1].xyz;
             // At the intersection point, the normal will be the component of p
             // that is roughly the same as the corresponding component of h
-            intersectable_normal = normalize(floor(p / h + 1e-4));
-        // Intersected triangle
-        } else if (ray.intersectable >= num_spheres) {
-            intersectable_normal = normalize(intersectable.data[1].xyz);
-        // Intersected sphere
-        } else {
-            // Normal is simply the vector from center to intersection point
-            intersectable_normal = normalize(intersection - intersectable.data[0].xyz);
+            intersection_normal = normalize(floor(p / h + 1e-4));
         }
 
-        vec3 current_color = material.ambient.xyz;
+        vec3 intersection_color = intersection_material.albedo.xyz *
+                                  intersection_material.mra.z * 0.03;
 
         // Calculate light contribution
         for (int i = 0; i < num_point_lights; i++) {
-            vec3 ray_to_light_dir = lights[i].position.xyz - intersection;
-            float ray_to_light_distance = length(ray_to_light_dir);
-            ray_to_light_dir = normalize(ray_to_light_dir);
-            // Bias intersection position up a bit to prevent self-intersection
-            vec3 ray_to_light_point = intersection + ray_to_light_dir * 1e-2;
-            Ray light_ray = create_ray(ray_to_light_point, ray_to_light_dir);
+            vec3 ray_to_light_dir = lights[i].position.xyz - intersection_position;
+            float light_distance = length(ray_to_light_dir);
+            Ray light_ray = create_ray(intersection_position, normalize(ray_to_light_dir));
 
             // If the light ray is not blocked by any object, calculate color
-            if (!intersects_object_to_light(light_ray, ray_to_light_distance)) {
-                current_color += calc_light_color(lights[i], ray_to_light_distance,
-                                                  intersection,
-                                                  eye_pos, intersectable_normal, material);
+            if (!intersects_object_to_light(light_ray, light_distance)) {
+                intersection_color += calc_color(lights[i].position.xyz, lights[i].color.xyz,
+                                                 light_distance * light_distance, eye_pos,
+                                                 intersection_position, intersection_normal,
+                                                 intersection_material);
             }
         }
 
         // Ray is now reflected off intersection point
-        ray_dir = reflect(ray_dir, intersectable_normal);
-        ray_pos = intersection + ray_dir * 1e-2;
+        ray_dir = reflect(ray_dir, intersection_normal);
+        ray_pos = intersection_position;
 
-        color += reflectivity * current_color;
-        reflectivity *= material.specular.xyz;
-
-        // If reflectivity is low, the additional colour will not have a meaningful effect
-        if (length(reflectivity) < 1e-3) {
-            break;
-        }
+        color += reflectance * intersection_color;
+        reflectance *= intersection_material.reflectance.xyz;
     }
+
+    color = gamma_correct(tone_mapping(color));
 
     imageStore(img_output, pixel_coords, vec4(color, 1.0));
 }

@@ -14,7 +14,7 @@ public:
 
   struct PointLight {
     vec3 position;
-    vec3 attenuation;
+    vec3 color;
   };
 
   void add_point_light(PointLight&& light);

@@ -41,6 +41,7 @@ void Intersectable::finalize()
   };
   const size_t total_size = spheres.size() + triangles.size() + aabbs.size();
   constexpr size_t intersectable_stride = 3;
+  constexpr size_t material_stride = 3;
 
   glBindBuffer(GL_UNIFORM_BUFFER, num_intersectables);
   glBufferData(GL_UNIFORM_BUFFER, static_cast<long>(num_objects.size() * sizeof (int)),
@@ -53,9 +54,12 @@ void Intersectable::finalize()
   material_data.reserve(total_size * intersectable_stride);
 
   const auto add_material = [&material_data](const Material& material) {
-    material_data.emplace_back(vec4(material.ambient, 0.0));
-    material_data.emplace_back(vec4(material.diffuse, 0.0));
-    material_data.emplace_back(vec4(material.specular, material.shininess));
+    material_data.emplace_back(vec4(material.albedo, 0.0));
+    material_data.emplace_back(vec4(material.metallic, material.roughness, material.ao, 0.0));
+
+    vec3 f0 = glm::mix(vec3(0.04f), material.albedo, material.metallic);
+    vec3 reflectance = (f0 + (vec3(1.0f) - f0) * pow(0.5f, 5.0f)) * (1.0f - material.roughness);
+    material_data.emplace_back(vec4(reflectance, 0.0));
   };
 
   for (const auto& [sphere, material] : spheres) {
@@ -91,7 +95,7 @@ void Intersectable::finalize()
 
   glBindBuffer(buffer_type, materials);
   glBufferStorage(buffer_type,
-                  static_cast<long>(total_size * intersectable_stride * sizeof (vec4)),
+                  static_cast<long>(total_size * material_stride * sizeof (vec4)),
                   material_data.data(), 0);
   glBindBufferBase(buffer_type, 5, materials);
 
