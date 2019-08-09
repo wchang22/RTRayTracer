@@ -1,6 +1,8 @@
-# Real-time RayTracer
-
-#### GPU real-time raytracer using OpenGL compute shaders
+<h1 align="center">Real-Time RayTracer</h1>
+<h3 align="center">GPU real-time raytracer using OpenGL compute shaders</h3>
+<p align="center">
+  <img src="examples/demo.gif" alt="Demo"    
+</p>
 
 ## Building/Running
 
