@@ -1,4 +1,5 @@
 #include "intersectable_manager.h"
+#include "acceleration/kdtree.h"
 
 #include <glad/glad.h>
 #include <algorithm>
@@ -102,4 +103,22 @@ void IntersectableManager::finalize()
   glBindBufferBase(buffer_type, 5, materials);
 
   glBindBuffer(buffer_type, 0);
+
+  build_kd_tree();
+}
+
+void IntersectableManager::build_kd_tree()
+{
+  std::vector<std::unique_ptr<Intersectable>> intrs;
+  std::transform(spheres.cbegin(), spheres.cend(), std::back_inserter(intrs), [](const auto& i) {
+    return std::make_unique<Sphere>(i.first);
+  });
+  std::transform(triangles.cbegin(), triangles.cend(), std::back_inserter(intrs), [](const auto& i) {
+    return std::make_unique<Triangle>(i.first);
+  });
+  std::transform(aabbs.cbegin(), aabbs.cend(), std::back_inserter(intrs), [](const auto& i) {
+    return std::make_unique<AABB>(i.first);
+  });
+
+  KDTree tree(std::move(intrs), 3);
 }

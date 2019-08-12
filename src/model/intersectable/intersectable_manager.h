@@ -29,6 +29,8 @@ public:
   void finalize();
 
 private:
+  void build_kd_tree();
+
   unsigned int intersectables, num_intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;
   std::vector<std::pair<Sphere, Material>> spheres;
