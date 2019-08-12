@@ -7,6 +7,7 @@
 #include "sphere.h"
 #include "triangle.h"
 #include "aabb.h"
+#include "acceleration/kdtree.h"
 
 using namespace glm;
 
@@ -29,7 +30,7 @@ public:
   void finalize();
 
 private:
-  void build_kd_tree();
+  KDTree build_kd_tree();
 
   unsigned int intersectables, num_intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;

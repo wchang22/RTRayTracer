@@ -1,10 +1,14 @@
 #include "kdtree.h"
 
+#include <glad/glad.h>
 #include <algorithm>
 
 KDTree::KDTree(std::vector<std::unique_ptr<Intersectable>>&& intersectables, int max_depth)
   : intersectables(std::move(intersectables)), max_depth(max_depth)
 {
+  glGenBuffers(1, &kd_tree_buffer);
+  glGenBuffers(1, &kd_contains_buffer);
+
   float inf = std::numeric_limits<float>::infinity();
   vec2 largest_bounds[3] = {{inf, -inf}, {inf, -inf}, {inf, -inf}};
 
@@ -47,6 +51,35 @@ KDTree::KDTree(std::vector<std::unique_ptr<Intersectable>>&& intersectables, int
 
   // Prune tree to get rid of extra nodes
   prune(tree);
+}
+
+KDTree::~KDTree()
+{
+  glDeleteBuffers(1, &kd_tree_buffer);
+  glDeleteBuffers(1, &kd_contains_buffer);
+}
+
+void KDTree::finalize()
+{
+  std::vector<FlatKDNode> flat_kd_tree;
+  std::vector<std::pair<int, Intersectable::Type>> kd_contains;
+
+  build_flat_kd_tree(flat_kd_tree, kd_contains, tree);
+
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, kd_tree_buffer);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, kd_tree_buffer);
+  glBufferStorage(GL_SHADER_STORAGE_BUFFER,
+                  static_cast<long>(sizeof (flat_kd_tree) * flat_kd_tree.size()),
+                  flat_kd_tree.data(), 0);
+
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, kd_contains_buffer);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, kd_contains_buffer);
+  glBufferStorage(GL_SHADER_STORAGE_BUFFER,
+                  static_cast<long>(sizeof (std::pair<int, Intersectable::Type>) *
+                                    kd_contains.size()),
+                  kd_contains.data(), 0);
+
+  glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void KDTree::build_empty_tree(int depth, std::unique_ptr<KDNode>& parent_node,
@@ -112,7 +145,7 @@ bool KDTree::insert_intersectable(std::unique_ptr<KDNode>& node, unsigned int in
   return true;
 }
 
-void KDTree::prune(std::unique_ptr<KDTree::KDNode>& node)
+void KDTree::prune(std::unique_ptr<KDNode>& node)
 {
   if (!node) {
     return;
@@ -132,4 +165,34 @@ void KDTree::prune(std::unique_ptr<KDTree::KDNode>& node)
       !node->right->left && !node->right->right) {
     node->right = nullptr;
   }
+}
+
+int KDTree::build_flat_kd_tree(std::vector<FlatKDNode>& flat_kd_tree,
+                               std::vector<std::pair<int, Intersectable::Type>>& kd_contains,
+                               std::unique_ptr<KDNode>& node)
+{
+  if (!node) {
+    return -1;
+  }
+
+  int index = static_cast<int>(flat_kd_tree.size());
+  // Add node
+  flat_kd_tree.emplace_back(node->aabb.center, node->aabb.lengths / 2.0f,
+                            0, 0, kd_contains.size(), node->intersectables.size());
+
+  // Add all contained intersectables as (intersectable index, intersectable type)
+  std::transform(node->intersectables.cbegin(), node->intersectables.cend(),
+                 std::back_inserter(kd_contains),
+    [this](unsigned int i) {
+      return std::make_pair(i, intersectables[i]->get_type());
+    }
+  );
+
+  // Recursively build tree
+  flat_kd_tree[static_cast<unsigned int>(index)].left =
+      build_flat_kd_tree(flat_kd_tree, kd_contains, node->left);
+  flat_kd_tree[static_cast<unsigned int>(index)].right =
+      build_flat_kd_tree(flat_kd_tree, kd_contains, node->right);
+
+  return index;
 }

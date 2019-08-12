@@ -29,6 +29,20 @@ struct Material {
     vec4 reflectance;
 };
 
+struct KDNode {
+    vec4 center;
+    vec4 half_lengths;
+    int left;
+    int right;
+    int intersectables_offset;
+    int num_intersectables;
+};
+
+struct KDData {
+    int index;
+    int type;
+};
+
 layout (std140, binding = 2) uniform EyeCoords {
     vec2 coord_scale;
     vec2 coord_dims;
@@ -56,6 +70,14 @@ layout (std140, binding = 6) uniform NumLights {
 
 layout (std430, binding = 7) buffer Lights {
     Light lights[];
+};
+
+layout (std430, binding = 8) buffer KDTree {
+    KDNode kd_tree[];
+};
+
+layout (std430, binding = 9) buffer KDContains {
+    KDData kd_contains[];
 };
 
 void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
