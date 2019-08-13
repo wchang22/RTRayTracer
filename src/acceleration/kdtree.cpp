@@ -55,8 +55,8 @@ KDTree::KDTree(std::vector<std::unique_ptr<Intersectable>>&& intersectables, int
 
 KDTree::~KDTree()
 {
-  glDeleteBuffers(1, &kd_tree_buffer);
-  glDeleteBuffers(1, &kd_contains_buffer);
+//  glDeleteBuffers(1, &kd_tree_buffer);
+//  glDeleteBuffers(1, &kd_contains_buffer);
 }
 
 void KDTree::finalize()
@@ -67,17 +67,17 @@ void KDTree::finalize()
   build_flat_kd_tree(flat_kd_tree, kd_contains, tree);
 
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, kd_tree_buffer);
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, kd_tree_buffer);
   glBufferStorage(GL_SHADER_STORAGE_BUFFER,
-                  static_cast<long>(sizeof (flat_kd_tree) * flat_kd_tree.size()),
+                  static_cast<long>(sizeof (FlatKDNode) * flat_kd_tree.size()),
                   flat_kd_tree.data(), 0);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, kd_tree_buffer);
 
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, kd_contains_buffer);
-  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, kd_contains_buffer);
   glBufferStorage(GL_SHADER_STORAGE_BUFFER,
                   static_cast<long>(sizeof (std::pair<int, Intersectable::Type>) *
                                     kd_contains.size()),
                   kd_contains.data(), 0);
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, kd_contains_buffer);
 
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
@@ -177,7 +177,8 @@ int KDTree::build_flat_kd_tree(std::vector<FlatKDNode>& flat_kd_tree,
 
   int index = static_cast<int>(flat_kd_tree.size());
   // Add node
-  flat_kd_tree.emplace_back(node->aabb.center, node->aabb.lengths / 2.0f,
+  flat_kd_tree.emplace_back(node->aabb.center - node->aabb.lengths / 2.0f,
+                            node->aabb.center + node->aabb.lengths / 2.0f,
                             0, 0, kd_contains.size(), node->intersectables.size());
 
   // Add all contained intersectables as (intersectable index, intersectable type)

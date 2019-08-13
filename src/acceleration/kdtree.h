@@ -25,13 +25,13 @@ private:
   };
 
   struct FlatKDNode {
-    FlatKDNode(const vec4& center, const vec4& half_lengths, int left, int right,
+    FlatKDNode(const vec4& bound1, const vec4& bound2, int left, int right,
                int intersectables_offset, int num_intersectables)
-      : center(center), half_lengths(half_lengths), left(left), right(right),
+      : bound1(bound1), bound2(bound2), left(left), right(right),
         intersectables_offset(intersectables_offset), num_intersectables(num_intersectables) {}
 
-    vec4 center;
-    vec4 half_lengths;
+    vec4 bound1;
+    vec4 bound2;
     int left;
     int right;
     int intersectables_offset;

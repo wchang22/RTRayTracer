@@ -25,7 +25,7 @@ void Light::finalize()
   int num_point_lights = static_cast<int>(point_lights.size());
   glBindBuffer(GL_UNIFORM_BUFFER, num_lights);
   glBufferData(GL_UNIFORM_BUFFER, sizeof (int), &num_point_lights, GL_STATIC_DRAW);
-  glBindBufferBase(GL_UNIFORM_BUFFER, 6, num_lights);
+  glBindBufferBase(GL_UNIFORM_BUFFER, 5, num_lights);
 
   constexpr unsigned int light_stride = 2;
 
@@ -43,7 +43,7 @@ void Light::finalize()
   glBufferStorage(buffer_type,
                   static_cast<long>(point_lights.size() * light_stride * sizeof (vec4)),
                   light_data.data(), 0);
-  glBindBufferBase(buffer_type, 7, lights);
+  glBindBufferBase(buffer_type, 6, lights);
 
   glBindBuffer(buffer_type, 0);
 }
