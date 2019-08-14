@@ -68,8 +68,8 @@ void IntersectableManager::finalize()
   }
 
   for (const auto& [aabb, material] : aabbs) {
-    intersectable_data.emplace_back(aabb.center);
-    intersectable_data.emplace_back(aabb.lengths / 2.0f);
+    intersectable_data.emplace_back(aabb.center - aabb.lengths / 2.0f);
+    intersectable_data.emplace_back(aabb.center + aabb.lengths / 2.0f);
     intersectable_data.emplace_back();
     add_material(material);
   }

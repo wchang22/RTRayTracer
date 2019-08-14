@@ -17,7 +17,7 @@ struct Ray {
     vec3 direction;
     vec3 inv_direction;
     float length;
-    int intersectable;
+    int intersectable_index;
     int intersectable_type;
 };
 
@@ -93,7 +93,7 @@ Ray create_ray(vec3 point, vec3 direction) {
 }
 
 // Sphere intersection
-bool intersects(inout Ray ray, int intersectable, vec3 center, float r2) {
+bool intersects(inout Ray ray, int intersectable_index, vec3 center, float r2) {
     // offset of sphere center from ray point
     vec3 l = center - ray.point;
     // projection of l onto ray direction
@@ -124,13 +124,13 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, float r2) {
     }
 
     ray.length = t;
-    ray.intersectable = intersectable;
+    ray.intersectable_index = intersectable_index;
     ray.intersectable_type = SPHERE;
     return true;
 }
 
 // Triangle intersection
-bool intersects(inout Ray ray, int intersectable,
+bool intersects(inout Ray ray, int intersectable_index,
                 vec3 vertex, vec3 normal, vec3 edge1, vec3 edge2) {
     float a = dot(-normal, ray.direction);
 
@@ -156,24 +156,27 @@ bool intersects(inout Ray ray, int intersectable,
     }
 
     ray.length = t;
-    ray.intersectable = intersectable;
+    ray.intersectable_index = intersectable_index;
     ray.intersectable_type = TRIANGLE;
     return true;
 }
 
-// AABB intersection
-bool intersects(inout Ray ray, int intersectable, vec3 center, vec3 halfs) {
-    vec3 p = center - ray.point;
-
+void aabb_slab(Ray ray, vec3 bound1, vec3 bound2, out float tmin, out float tmax) {
     // Find slab bounds on AABB
-    vec3 t1 = (p - halfs) * ray.inv_direction;
-    vec3 t2 = (p + halfs) * ray.inv_direction;
+    vec3 t1 = (bound1 - ray.point) * ray.inv_direction;
+    vec3 t2 = (bound2 - ray.point) * ray.inv_direction;
     vec3 tvmin = min(t1, t2);
     vec3 tvmax = max(t1, t2);
 
     // Find tightest components of min and max
-    float tmin = max(tvmin.x, max(tvmin.y, tvmin.z));
-    float tmax = min(tvmax.x, min(tvmax.y, tvmax.z));
+    tmin = max(tvmin.x, max(tvmin.y, tvmin.z));
+    tmax = min(tvmax.x, min(tvmax.y, tvmax.z));
+}
+
+// AABB intersection
+bool intersects(inout Ray ray, int intersectable_index, vec3 bound1, vec3 bound2) {
+    float tmin, tmax;
+    aabb_slab(ray, bound1, bound2, tmin, tmax);
 
     // Determine if ray misses, is in front of AABB or if intersection is not closer
     // than an existing one
@@ -182,40 +185,46 @@ bool intersects(inout Ray ray, int intersectable, vec3 center, vec3 halfs) {
     }
 
     ray.length = tmin > 0 ? tmin : tmax;
-    ray.intersectable = intersectable;
+    ray.intersectable_index = intersectable_index;
     ray.intersectable_type = AABB;
     return true;
 }
 
 // AABB fast intersection for KDTree
 bool intersects(Ray ray, vec3 bound1, vec3 bound2) {
-    // Find slab bounds on AABB
-    vec3 t1 = (bound1 - ray.point) * ray.inv_direction;
-    vec3 t2 = (bound2 - ray.point) * ray.inv_direction;
-    vec3 tvmin = min(t1, t2);
-    vec3 tvmax = max(t1, t2);
-
-    // Find tightest components of min and max
-    float tmin = max(tvmin.x, max(tvmin.y, tvmin.z));
-    float tmax = min(tvmax.x, min(tvmax.y, tvmax.z));
+    float tmin, tmax;
+    aabb_slab(ray, bound1, bound2, tmin, tmax);
 
     return tmin <= tmax;
 }
 
-void intersects_sphere(inout Ray ray, int intersectable) {
-    vec4 center_r2 = intersectables[intersectable].data[0];
-    intersects(ray, intersectable, center_r2.xyz, center_r2.w);
+void intersects_sphere(inout Ray ray, int intersectable_index) {
+    vec4 center_r2 = intersectables[intersectable_index].data[0];
+    intersects(ray, intersectable_index, center_r2.xyz, center_r2.w);
 }
 
-void intersects_triangle(inout Ray ray, int intersectable) {
+void intersects_triangle(inout Ray ray, int intersectable_index) {
     vec3 vne1e2[4];
-    unpack(intersectables[intersectable].data, vne1e2);
-    intersects(ray, intersectable, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
+    unpack(intersectables[intersectable_index].data, vne1e2);
+    intersects(ray, intersectable_index, vne1e2[0], vne1e2[1], vne1e2[2], vne1e2[3]);
 }
 
-void intersects_aabb(inout Ray ray, int intersectable) {
-    intersects(ray, intersectable, intersectables[intersectable].data[0].xyz,
-               intersectables[intersectable].data[1].xyz);
+void intersects_aabb(inout Ray ray, int intersectable_index) {
+    Intersectable intersectable = intersectables[intersectable_index];
+    intersects(ray, intersectable_index, intersectable.data[0].xyz, intersectable.data[1].xyz);
+}
+
+void compute_intersection(inout Ray ray, int intersectable_type, int intersectable_index) {
+    switch (intersectable_type) {
+        case SPHERE:
+            intersects_sphere(ray, intersectable_index);
+            break;
+        case TRIANGLE:
+            intersects_triangle(ray, intersectable_index);
+            break;
+        default:
+            intersects_aabb(ray, intersectable_index);
+    }
 }
 
 bool intersects_object_to_light(inout Ray ray, float light_distance) {
@@ -229,32 +238,23 @@ bool intersects_object_to_light(inout Ray ray, float light_distance) {
         if (intersects(ray, node.bound1.xyz, node.bound2.xyz)) {
             for (int i = node.intersectables_offset;
                  i < node.intersectables_offset + node.num_intersectables; i++) {
-                KDData data = kd_contains[i];
-
-                switch (data.type) {
-                    case SPHERE:
-                        intersects_sphere(ray, data.index);
-                        break;
-                    case TRIANGLE:
-                        intersects_triangle(ray, data.index);
-                        break;
-                    default:
-                        intersects_aabb(ray, data.index);
-                }
+                KDData intersectable_data = kd_contains[i];
+                compute_intersection(ray, intersectable_data.type, intersectable_data.index);
 
                 if (ray.length < light_distance) {
                     return true;
                 }
             }
 
-            if (node.left != -1) {
-                stack[stack_ptr++] = node.left;
-            }
             if (node.right != -1) {
                 stack[stack_ptr++] = node.right;
             }
+            if (node.left != -1) {
+                stack[stack_ptr++] = node.left;
+            }
         }
     }
+
     return false;
 }
 
@@ -269,30 +269,20 @@ bool intersects_object(inout Ray ray) {
         if (intersects(ray, node.bound1.xyz, node.bound2.xyz)) {
             for (int i = node.intersectables_offset;
                  i < node.intersectables_offset + node.num_intersectables; i++) {
-                KDData data = kd_contains[i];
-
-                switch (data.type) {
-                    case SPHERE:
-                        intersects_sphere(ray, data.index);
-                        break;
-                    case TRIANGLE:
-                        intersects_triangle(ray, data.index);
-                        break;
-                    default:
-                        intersects_aabb(ray, data.index);
-                }
+                KDData intersectable_data = kd_contains[i];
+                compute_intersection(ray, intersectable_data.type, intersectable_data.index);
             }
 
-            if (node.left != -1) {
-                stack[stack_ptr++] = node.left;
-            }
             if (node.right != -1) {
                 stack[stack_ptr++] = node.right;
+            }
+            if (node.left != -1) {
+                stack[stack_ptr++] = node.left;
             }
         }
     }
 
-    return ray.intersectable != -1;
+    return ray.intersectable_index != -1;
 }
 
 vec3 fresnel_schlick(float cos_theta, vec3 f0) {
@@ -387,8 +377,8 @@ void main() {
 
         vec3 intersection_position = ray.point + ray.length * ray.direction;
         vec3 intersection_normal;
-        Intersectable intersectable = intersectables[ray.intersectable];
-        Material intersection_material = materials[ray.intersectable];
+        Intersectable intersectable = intersectables[ray.intersectable_index];
+        Material intersection_material = materials[ray.intersectable_index];
 
         // Intersected sphere
         switch (ray.intersectable_type) {
@@ -399,10 +389,12 @@ void main() {
                 intersection_normal = normalize(intersectable.data[1].xyz);
                 break;
             default:
+                // c is the center of the aabb
+                vec3 c = (intersectable.data[1].xyz + intersectable.data[0].xyz) / 2.0;
                 // p is the vector from the center to intersection point
-                vec3 p = abs(intersection_position - intersectable.data[0].xyz);
+                vec3 p = abs(intersection_position - c);
                 // h is the vector of half lengths
-                vec3 h = intersectable.data[1].xyz;
+                vec3 h = intersectable.data[1].xyz - c;
                 // At the intersection point, the normal will be the component of p
                 // that is roughly the same as the corresponding component of h
                 intersection_normal = normalize(floor(p / h + 1e-4));

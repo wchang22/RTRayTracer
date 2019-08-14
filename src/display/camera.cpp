@@ -13,10 +13,11 @@ Camera::Camera(vec3 position, vec3 forward, vec3 up, int width, int height, floa
     width(width),
     height(height)
 {
+  glGenBuffers(1, &UBO);
+
   vec2 coord_scale = get_coord_scale();
   vec2 coord_dims = get_coord_dims();
 
-  glGenBuffers(1, &UBO);
   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
   glBufferData(GL_UNIFORM_BUFFER, 5 * sizeof (vec4), nullptr, GL_DYNAMIC_DRAW);
   vec4* ubo_ptr = reinterpret_cast<vec4*>(glMapNamedBufferRange(UBO, 0, sizeof (vec4),
