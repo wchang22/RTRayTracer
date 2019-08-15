@@ -1,44 +1,46 @@
-#include "intersectable.h"
+#include "intersectable_manager.h"
 
 #include <glad/glad.h>
+#include <algorithm>
+#include <memory>
 
-Intersectable::Intersectable()
+IntersectableManager::IntersectableManager()
 {
   glGenBuffers(1, &intersectables);
-  glGenBuffers(1, &materials);
   glGenBuffers(1, &num_intersectables);
+  glGenBuffers(1, &materials);
 }
 
-Intersectable::~Intersectable()
+IntersectableManager::~IntersectableManager()
 {
   glDeleteBuffers(1, &intersectables);
-  glDeleteBuffers(1, &materials);
   glDeleteBuffers(1, &num_intersectables);
+  glDeleteBuffers(1, &materials);
 }
 
-void Intersectable::add_triangle(Intersectable::Triangle&& triangle, Intersectable::Material&& material)
+void IntersectableManager::add_triangle(Triangle&& triangle, Material&& material)
 {
   triangles.emplace_back(std::move(triangle), std::move(material));
 }
 
-void Intersectable::add_sphere(Intersectable::Sphere&& sphere, Intersectable::Material&& material)
+void IntersectableManager::add_sphere(Sphere&& sphere, Material&& material)
 {
   spheres.emplace_back(std::move(sphere), std::move(material));
 }
 
-void Intersectable::add_axis_aligned_box(Intersectable::AxisAlignedBox&& aabb,
-                                         Intersectable::Material&& material)
+void IntersectableManager::add_aabb(AABB&& aabb, Material&& material)
 {
   aabbs.emplace_back(std::move(aabb), std::move(material));
 }
 
-void Intersectable::finalize()
+void IntersectableManager::finalize()
 {
   const std::vector<int> num_objects = {
     static_cast<int>(spheres.size()),
     static_cast<int>(triangles.size()),
     static_cast<int>(aabbs.size())
   };
+
   const size_t total_size = spheres.size() + triangles.size() + aabbs.size();
   constexpr size_t intersectable_stride = 3;
   constexpr size_t material_stride = 3;
@@ -51,7 +53,7 @@ void Intersectable::finalize()
   std::vector<vec4> intersectable_data;
   std::vector<vec4> material_data;
   intersectable_data.reserve(total_size * intersectable_stride);
-  material_data.reserve(total_size * intersectable_stride);
+  material_data.reserve(total_size * material_stride);
 
   const auto add_material = [&material_data](const Material& material) {
     material_data.emplace_back(vec4(material.albedo, 0.0));
@@ -79,8 +81,8 @@ void Intersectable::finalize()
   }
 
   for (const auto& [aabb, material] : aabbs) {
-    intersectable_data.emplace_back(vec4(aabb.center - aabb.lengths / 2.0f, 0.0));
-    intersectable_data.emplace_back(vec4(aabb.center + aabb.lengths / 2.0f, 0.0));
+    intersectable_data.emplace_back(aabb.center - aabb.lengths / 2.0f);
+    intersectable_data.emplace_back(aabb.center + aabb.lengths / 2.0f);
     intersectable_data.emplace_back();
     add_material(material);
   }

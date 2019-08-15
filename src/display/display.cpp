@@ -18,28 +18,28 @@ Display::Display(std::shared_ptr<Camera> camera)
   rect.add_vertex_attribs({ 2, 2 });
   rect.finalize_setup();
 
-  intersectable.add_sphere({ vec3(0.0f, 0.8f, 1.0f), 0.8f },
-                           { vec3(0.2f, 1.0f, 0.2f), 0.8f, 0.5f, 0.6f });
-  intersectable.add_sphere({ vec3(3.0f, 1.0f, 0.0f), 1.0f },
-                           { vec3(1.0f, 0.2f, 0.2f), 1.0f, 0.1f, 0.6f });
-  intersectable.add_sphere({ vec3(-3.0f, 0.5f, -0.5f), 0.5f },
-                           { vec3(0.2f, 0.2f, 1.0f), 0.2f, 1.0f, 0.7f });
-  intersectable.add_sphere({ vec3(1.0f, 0.75f, -2.0f), 0.75f },
-                           { vec3(1.0f, 1.0f, 0.2f), 0.2f, 0.1f, 0.5f });
-  intersectable.add_sphere({ vec3(-2.0f, 0.6f, -3.0f), 0.6f },
-                           { vec3(1.0f), 1.0f, 0.1f, 0.0f });
+  intersectables.add_sphere({ vec3(0.0f, 0.8f, 1.0f), 0.8f },
+                            { vec3(0.2f, 1.0f, 0.2f), 0.8f, 0.5f, 0.6f });
+  intersectables.add_sphere({ vec3(3.0f, 1.0f, 0.0f), 1.0f },
+                            { vec3(1.0f, 0.2f, 0.2f), 1.0f, 0.1f, 0.6f });
+  intersectables.add_sphere({ vec3(-3.0f, 0.5f, -0.5f), 0.5f },
+                            { vec3(0.2f, 0.2f, 1.0f), 0.2f, 1.0f, 0.7f });
+  intersectables.add_sphere({ vec3(1.0f, 0.75f, -2.0f), 0.75f },
+                            { vec3(1.0f, 1.0f, 0.2f), 0.2f, 0.1f, 0.5f });
+  intersectables.add_sphere({ vec3(-2.0f, 0.6f, -3.0f), 0.6f },
+                            { vec3(1.0f), 1.0f, 0.1f, 0.0f });
 
-  intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, -8.0f) },
+  intersectables.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, -8.0f) },
                              { vec3(0.2f), 0.2f, 0.2f, 0.0f });
-  intersectable.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
+  intersectables.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
                              { vec3(0.2f), 0.2f, 0.2f, 0.0f });
 
-  intersectable.add_axis_aligned_box(
+  intersectables.add_aabb(
     { vec3(-1.0f, 1.0f, -1.0f), vec3(1.0f, 2.0f, 1.0f) },
     { vec3(1.0f, 0.5f, 1.0f), 1.0f, 0.1f, 0.2f }
   );
 
-  intersectable.finalize();
+  intersectables.finalize();
 
   light.add_point_light({ vec3(5.0, 5.0, -2.0), vec3(50.0, 50.0, 8.0) });
   light.add_point_light({ vec3(-5.0, 5.0, -2.0), vec3(8.0, 8.0, 50.0) });

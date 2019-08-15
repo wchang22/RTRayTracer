@@ -1,16 +1,20 @@
-#ifndef INTERSECTABLE_H
-#define INTERSECTABLE_H
+#ifndef INTERSECTABLEMANAGER_H
+#define INTERSECTABLEMANAGER_H
 
 #include <vector>
 #include <glm/glm.hpp>
 
+#include "sphere.h"
+#include "triangle.h"
+#include "aabb.h"
+
 using namespace glm;
 
-class Intersectable
+class IntersectableManager
 {
 public:
-  Intersectable();
-  ~Intersectable();
+  IntersectableManager();
+  ~IntersectableManager();
 
   struct Material {
     vec3 albedo;
@@ -19,30 +23,16 @@ public:
     float ao;
   };
 
-  struct Triangle {
-    vec3 vertices[3];
-  };
-
-  struct Sphere {
-    vec3 center;
-    float radius;
-  };
-
-  struct AxisAlignedBox {
-    vec3 center;
-    vec3 lengths;
-  };
-
   void add_triangle(Triangle&& triangle, Material&& material);
   void add_sphere(Sphere&& sphere, Material&& material);
-  void add_axis_aligned_box(AxisAlignedBox&& aabb, Material&& material);
+  void add_aabb(AABB&& aabb, Material&& material);
   void finalize();
 
 private:
   unsigned int intersectables, num_intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;
   std::vector<std::pair<Sphere, Material>> spheres;
-  std::vector<std::pair<AxisAlignedBox, Material>> aabbs;
+  std::vector<std::pair<AABB, Material>> aabbs;
 };
 
-#endif // INTERSECTABLE_H
+#endif // INTERSECTABLEMANAGER_H
