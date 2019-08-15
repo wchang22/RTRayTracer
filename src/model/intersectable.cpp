@@ -79,8 +79,8 @@ void Intersectable::finalize()
   }
 
   for (const auto& [aabb, material] : aabbs) {
-    intersectable_data.emplace_back(vec4(aabb.center, 0.0));
-    intersectable_data.emplace_back(vec4(aabb.x / 2.0f, aabb.y / 2.0f, aabb.z / 2.0f, 0.0));
+    intersectable_data.emplace_back(vec4(aabb.center - aabb.lengths / 2.0f, 0.0));
+    intersectable_data.emplace_back(vec4(aabb.center + aabb.lengths / 2.0f, 0.0));
     intersectable_data.emplace_back();
     add_material(material);
   }

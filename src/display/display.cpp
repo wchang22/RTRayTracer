@@ -35,7 +35,7 @@ Display::Display(std::shared_ptr<Camera> camera)
                              { vec3(0.2f), 0.2f, 0.2f, 0.0f });
 
   intersectable.add_axis_aligned_box(
-    { vec3(-1.0f, 1.0f, -1.0f), 1.0f, 2.0f, 1.0f },
+    { vec3(-1.0f, 1.0f, -1.0f), vec3(1.0f, 2.0f, 1.0f) },
     { vec3(1.0f, 0.5f, 1.0f), 1.0f, 0.1f, 0.2f }
   );
 
@@ -55,6 +55,7 @@ void Display::draw() const
   PROFILE_SCOPE("Draw");
 
   PROFILE_SECTION_START("Update Camera");
+  camera->circle();
   camera->update_frames();
   PROFILE_SECTION_END();
 

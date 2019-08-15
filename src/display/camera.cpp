@@ -19,8 +19,10 @@ Camera::Camera(vec3 position, vec3 forward, vec3 up, int width, int height, floa
   glGenBuffers(1, &UBO);
   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
   glBufferData(GL_UNIFORM_BUFFER, 5 * sizeof (vec4), nullptr, GL_DYNAMIC_DRAW);
-  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof (vec2), &coord_scale[0]);
-  glBufferSubData(GL_UNIFORM_BUFFER, sizeof (vec2), sizeof (vec2), &coord_dims[0]);
+  vec4* ubo_ptr = reinterpret_cast<vec4*>(glMapNamedBufferRange(UBO, 0, sizeof (vec4),
+                                                                GL_MAP_WRITE_BIT));
+  ubo_ptr[0] = vec4(coord_scale, coord_dims);
+  glUnmapNamedBuffer(UBO);
   glBindBufferBase(GL_UNIFORM_BUFFER, 2, UBO);
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
@@ -84,10 +86,14 @@ void Camera::update_frames() {
   mat3 coord_frame = get_coord_frame();
 
   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-  glBufferSubData(GL_UNIFORM_BUFFER, sizeof (vec4), sizeof (vec3), &camera_pos[0]);
-  glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof (vec4), sizeof (vec3), &coord_frame[0]);
-  glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof (vec4), sizeof (vec3), &coord_frame[1]);
-  glBufferSubData(GL_UNIFORM_BUFFER, 4 * sizeof (vec4), sizeof (vec3), &coord_frame[2]);
+  vec4* ubo_ptr = reinterpret_cast<vec4*>(
+                    glMapNamedBufferRange(UBO, sizeof (vec4), 4 * sizeof (vec4),
+                                          GL_MAP_WRITE_BIT));
+  ubo_ptr[0] = vec4(camera_pos, 0.0);
+  ubo_ptr[1] = vec4(coord_frame[0], 0.0);
+  ubo_ptr[2] = vec4(coord_frame[1], 0.0);
+  ubo_ptr[3] = vec4(coord_frame[2], 0.0);
+  glUnmapNamedBuffer(UBO);
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 

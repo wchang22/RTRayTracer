@@ -30,9 +30,7 @@ public:
 
   struct AxisAlignedBox {
     vec3 center;
-    float x;
-    float y;
-    float z;
+    vec3 lengths;
   };
 
   void add_triangle(Triangle&& triangle, Material&& material);
