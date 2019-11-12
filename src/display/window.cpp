@@ -54,6 +54,9 @@ Window::~Window() {
 }
 
 void Window::main_loop() {
+  double t_start = glfwGetTime();
+  uint32_t n_frames = 0;
+
   try {
     while (!glfwWindowShouldClose(window)) {
       PROFILE_SCOPE("Main Loop");
@@ -70,6 +73,19 @@ void Window::main_loop() {
       glfwPollEvents();
       key_callback();
       mouse_callback();
+      PROFILE_SECTION_END();
+
+      PROFILE_SECTION_START("Timing");
+      double t_end = glfwGetTime();
+      double duration = t_end - t_start;
+
+      if (duration > 1.0) {
+        glfwSetWindowTitle(window, (std::to_string(n_frames / duration) + " FPS").c_str());
+        n_frames = 0;
+        t_start = t_end;
+      } else {
+        n_frames++;
+      }
       PROFILE_SECTION_END();
     }
   } catch (...) {
