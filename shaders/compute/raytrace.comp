@@ -36,7 +36,7 @@ struct Material {
     vec4 reflectance;
 };
 
-struct KDNode {
+struct BVHNode {
     vec4 bound1;
     vec4 bound2;
     int left;
@@ -45,7 +45,7 @@ struct KDNode {
     int num_intersectables;
 };
 
-struct KDData {
+struct BVHData {
     int index;
     int type;
 };
@@ -73,12 +73,12 @@ layout (std430, binding = 6) buffer Lights {
     Light lights[];
 };
 
-layout (std140, binding = 7) buffer KDTree {
-    KDNode kd_tree[];
+layout (std140, binding = 7) buffer BVH {
+    BVHNode bvh[];
 };
 
-layout (std430, binding = 8) buffer KDContains {
-    KDData kd_contains[];
+layout (std430, binding = 8) buffer BVHContains {
+    BVHData bvh_contains[];
 };
 
 void unpack(in vec4 data_in[3], out vec3 data_out[4]) {
@@ -190,7 +190,7 @@ bool intersects(inout Ray ray, int intersectable_index, vec3 bound1, vec3 bound2
     return true;
 }
 
-// AABB fast intersection for KDTree
+// AABB fast intersection for BVH
 bool intersects(Ray ray, vec3 bound1, vec3 bound2) {
     float tmin, tmax;
     aabb_slab(ray, bound1, bound2, tmin, tmax);
@@ -233,12 +233,12 @@ bool intersects_object_to_light(inout Ray ray, float light_distance) {
     stack[stack_ptr++] = -1;
 
     for (int node_index = 0; node_index != -1; node_index = stack[--stack_ptr]) {
-        KDNode node = kd_tree[node_index];
+        BVHNode node = bvh[node_index];
 
         if (intersects(ray, node.bound1.xyz, node.bound2.xyz)) {
             for (int i = node.intersectables_offset;
                  i < node.intersectables_offset + node.num_intersectables; i++) {
-                KDData intersectable_data = kd_contains[i];
+                BVHData intersectable_data = bvh_contains[i];
                 compute_intersection(ray, intersectable_data.type, intersectable_data.index);
 
                 if (ray.length < light_distance) {
@@ -264,12 +264,12 @@ bool intersects_object(inout Ray ray) {
     stack[stack_ptr++] = -1;
 
     for (int node_index = 0; node_index != -1; node_index = stack[--stack_ptr]) {
-        KDNode node = kd_tree[node_index];
+        BVHNode node = bvh[node_index];
 
         if (intersects(ray, node.bound1.xyz, node.bound2.xyz)) {
             for (int i = node.intersectables_offset;
                  i < node.intersectables_offset + node.num_intersectables; i++) {
-                KDData intersectable_data = kd_contains[i];
+                BVHData intersectable_data = bvh_contains[i];
                 compute_intersection(ray, intersectable_data.type, intersectable_data.index);
             }
 

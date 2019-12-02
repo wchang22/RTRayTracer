@@ -90,11 +90,11 @@ void IntersectableManager::finalize()
 
   glBindBuffer(buffer_type, 0);
 
-  tree = build_kd_tree();
+  tree = build_bvh();
   tree->finalize();
 }
 
-std::unique_ptr<KDTree> IntersectableManager::build_kd_tree()
+std::unique_ptr<BVH> IntersectableManager::build_bvh()
 {
   std::vector<std::unique_ptr<Intersectable>> intrs;
   std::transform(spheres.cbegin(), spheres.cend(), std::back_inserter(intrs), [](const auto& i) {
@@ -107,5 +107,5 @@ std::unique_ptr<KDTree> IntersectableManager::build_kd_tree()
     return std::make_unique<AABB>(i.first);
   });
 
-  return std::make_unique<KDTree>(std::move(intrs), 3);
+  return std::make_unique<BVH>(std::move(intrs), 3);
 }

@@ -7,7 +7,7 @@
 #include "sphere.h"
 #include "triangle.h"
 #include "aabb.h"
-#include "acceleration/kdtree.h"
+#include "acceleration/bvh.h"
 
 using namespace glm;
 
@@ -30,13 +30,13 @@ public:
   void finalize();
 
 private:
-  std::unique_ptr<KDTree> build_kd_tree();
+  std::unique_ptr<BVH> build_bvh();
 
   unsigned int intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;
   std::vector<std::pair<Sphere, Material>> spheres;
   std::vector<std::pair<AABB, Material>> aabbs;
-  std::unique_ptr<KDTree> tree;
+  std::unique_ptr<BVH> tree;
 };
 
 #endif // INTERSECTABLEMANAGER_H
