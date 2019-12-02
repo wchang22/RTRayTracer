@@ -9,7 +9,8 @@ Display::Display(std::shared_ptr<Camera> camera)
     compute_shader("../../shaders/compute/raytrace.comp",
                    static_cast<unsigned int>(Window::get_width()),
                    static_cast<unsigned int>(Window::get_height()), 1),
-    image(Window::get_width(), Window::get_height())
+    image(Window::get_width(), Window::get_height()),
+    model("../../assets/aircraft/aircraft.obj", intersectables)
 {
   image.add_image(GL_RGBA8, false, true);
 
@@ -18,18 +19,10 @@ Display::Display(std::shared_ptr<Camera> camera)
   rect.add_vertex_attribs({ 2, 2 });
   rect.finalize_setup();
 
-  intersectables.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, -8.0f) },
-                             { vec3(0.2f), 0.2f, 0.2f, 0.0f });
-  intersectables.add_triangle({ vec3(8.0f, 0.0f, 8.0f), vec3(-8.0f, 0.0f, -8.0f), vec3(-8.0f, 0.0f, 8.0f) },
-                             { vec3(0.2f), 0.2f, 0.2f, 0.0f });
-
   intersectables.finalize();
 
-  light.add_point_light({ vec3(5.0, 5.0, -2.0), vec3(50.0, 50.0, 8.0) });
-  light.add_point_light({ vec3(-5.0, 5.0, -2.0), vec3(8.0, 8.0, 50.0) });
-  light.add_point_light({ vec3(0.0, 5.0, 2.0), vec3(50.0) });
-  light.add_point_light({ vec3(-3.0, 10.0, 1.0), vec3(50.0) });
-  light.add_point_light({ vec3(4.0, 10.0, -4.0), vec3(50.0) });
+  light.add_point_light({ vec3(5.0, 5.0, -2.0), vec3(50.0, 50.0, 80.0) });
+  light.add_point_light({ vec3(-5.0, 5.0, -2.0), vec3(80.0, 80.0, 50.0) });
 
   light.finalize();
 }
@@ -39,7 +32,6 @@ void Display::draw() const
   PROFILE_SCOPE("Draw");
 
   PROFILE_SECTION_START("Update Camera");
-  camera->circle();
   camera->update_frames();
   PROFILE_SECTION_END();
 

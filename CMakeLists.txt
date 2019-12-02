@@ -13,7 +13,7 @@ set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS
 file(GLOB_RECURSE SOURCES ${SOURCES} include/*)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
-target_link_options(${PROJECT_NAME} PRIVATE -lglfw -lGL -ldl)
+target_link_options(${PROJECT_NAME} PRIVATE -lglfw -lGL -ldl -lassimp)
 target_compile_options(${PROJECT_NAME} PRIVATE -std=c++17)
 target_include_directories(${PROJECT_NAME} PRIVATE src include)
 target_link_directories(${PROJECT_NAME} PRIVATE include)

@@ -4,6 +4,7 @@
 #include "model/object.h"
 #include "model/intersectable/intersectable_manager.h"
 #include "model/light.h"
+#include "model/model.h"
 #include "shader/shader.h"
 #include "shader/image.h"
 #include "display/camera.h"
@@ -24,6 +25,7 @@ private:
   Image image;
   IntersectableManager intersectables;
   Light light;
+  Model model;
 };
 
 #endif // DISPLAY_H

@@ -18,6 +18,9 @@ IntersectableManager::~IntersectableManager()
 
 void IntersectableManager::add_triangle(Triangle&& triangle, Material&& material)
 {
+  if (triangles.size() > 2000) {
+    return;
+  }
   triangles.emplace_back(std::move(triangle), std::move(material));
 }
 
