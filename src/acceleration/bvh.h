@@ -44,7 +44,7 @@ private:
   void prune(std::unique_ptr<BVHNode>& node);
 
   int build_flat_bvh(std::vector<FlatBVHNode>& flat_bvh,
-                         std::vector<std::pair<int, Intersectable::Type>>& bvh_contains,
+                         std::vector<int>& bvh_contains,
                          std::unique_ptr<BVHNode>& node);
 
   std::vector<std::unique_ptr<Intersectable>> intersectables;

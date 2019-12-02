@@ -62,7 +62,7 @@ BVH::~BVH()
 void BVH::finalize()
 {
   std::vector<FlatBVHNode> flat_bvh;
-  std::vector<std::pair<int, Intersectable::Type>> bvh_contains;
+  std::vector<int> bvh_contains;
 
   build_flat_bvh(flat_bvh, bvh_contains, tree);
 
@@ -74,8 +74,7 @@ void BVH::finalize()
 
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, bvh_contains_buffer);
   glBufferStorage(GL_SHADER_STORAGE_BUFFER,
-                  static_cast<long>(sizeof (std::pair<int, Intersectable::Type>) *
-                                    bvh_contains.size()),
+                  static_cast<long>(sizeof (Intersectable::Type) * bvh_contains.size()),
                   bvh_contains.data(), 0);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, bvh_contains_buffer);
 
@@ -167,33 +166,28 @@ void BVH::prune(std::unique_ptr<BVHNode>& node)
   }
 }
 
-int BVH::build_flat_bvh(std::vector<FlatBVHNode>& flat_BVH_tree,
-                               std::vector<std::pair<int, Intersectable::Type>>& BVH_contains,
-                               std::unique_ptr<BVHNode>& node)
+int BVH::build_flat_bvh(std::vector<FlatBVHNode>& flat_bvh,
+                        std::vector<int>& bvh_contains,
+                        std::unique_ptr<BVHNode>& node)
 {
   if (!node) {
     return -1;
   }
 
-  int index = static_cast<int>(flat_BVH_tree.size());
+  int index = static_cast<int>(flat_bvh.size());
   // Add node
-  flat_BVH_tree.emplace_back(node->aabb.center - node->aabb.lengths / 2.0f,
+  flat_bvh.emplace_back(node->aabb.center - node->aabb.lengths / 2.0f,
                             node->aabb.center + node->aabb.lengths / 2.0f,
-                            0, 0, BVH_contains.size(), node->intersectables.size());
+                            0, 0, bvh_contains.size(), node->intersectables.size());
 
-  // Add all contained intersectables as (intersectable index, intersectable type)
-  std::transform(node->intersectables.cbegin(), node->intersectables.cend(),
-                 std::back_inserter(BVH_contains),
-    [this](unsigned int i) {
-      return std::make_pair(i, intersectables[i]->get_type());
-    }
-  );
+  bvh_contains.insert(bvh_contains.end(),
+                      node->intersectables.cbegin(), node->intersectables.cend());
 
   // Recursively build tree
-  flat_BVH_tree[static_cast<unsigned int>(index)].left =
-      build_flat_bvh(flat_BVH_tree, BVH_contains, node->left);
-  flat_BVH_tree[static_cast<unsigned int>(index)].right =
-      build_flat_bvh(flat_BVH_tree, BVH_contains, node->right);
+  flat_bvh[static_cast<unsigned int>(index)].left =
+      build_flat_bvh(flat_bvh, bvh_contains, node->left);
+  flat_bvh[static_cast<unsigned int>(index)].right =
+      build_flat_bvh(flat_bvh, bvh_contains, node->right);
 
   return index;
 }

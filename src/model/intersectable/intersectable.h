@@ -14,7 +14,7 @@ public:
     X, Y, Z
   };
   enum class Type : int {
-    Sphere, Triangle, AABB
+    Triangle, AABB
   };
 
   virtual ~Intersectable() = default;
