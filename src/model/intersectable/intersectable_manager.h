@@ -30,12 +30,13 @@ public:
   void finalize();
 
 private:
-  KDTree build_kd_tree();
+  std::unique_ptr<KDTree> build_kd_tree();
 
   unsigned int intersectables, materials;
   std::vector<std::pair<Triangle, Material>> triangles;
   std::vector<std::pair<Sphere, Material>> spheres;
   std::vector<std::pair<AABB, Material>> aabbs;
+  std::unique_ptr<KDTree> tree;
 };
 
 #endif // INTERSECTABLEMANAGER_H

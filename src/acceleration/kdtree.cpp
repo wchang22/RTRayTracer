@@ -55,8 +55,8 @@ KDTree::KDTree(std::vector<std::unique_ptr<Intersectable>>&& intersectables, int
 
 KDTree::~KDTree()
 {
-//  glDeleteBuffers(1, &kd_tree_buffer);
-//  glDeleteBuffers(1, &kd_contains_buffer);
+  glDeleteBuffers(1, &kd_tree_buffer);
+  glDeleteBuffers(1, &kd_contains_buffer);
 }
 
 void KDTree::finalize()
